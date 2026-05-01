@@ -5,6 +5,30 @@ import plotly.graph_objects as go
 import numpy as np
 import os
 
+# 简单的密码验证
+def check_password():
+    """返回用户是否输入了正确的密码"""
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+    
+    if not st.session_state.password_correct:
+        st.title("🔐 登录")
+        password = st.text_input("请输入访问密码", type="password")
+        
+        # 这里设置你想要的密码，比如和老师一样：ai4finance
+        if password == "ESG123":
+            st.session_state.password_correct = True
+            st.rerun()
+        elif password:
+            st.error("密码错误，请重试")
+        return False
+    else:
+        return True
+
+# 执行密码检查
+if not check_password():
+    st.stop()
+
 # ================= 1. 全局配置与主题设置 =================
 st.set_page_config(
     page_title="企业ESG碳披露分析平台", 

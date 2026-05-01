@@ -412,11 +412,12 @@ if page == "📝 PDF自动打分":
                     st.warning("⚠️ 未上传Excel数据集，仅生成结果预览")
         
         with col2:
-            # 提供单条结果下载
+            # 提供单条结果下载（修复TypeError）
             @st.cache_data
             def convert_single_row(row):
-                return pd.DataFrame([row]).to_excel(index=False, engine='openpyxl')
-            
+                output = BytesIO()
+                pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
+                return output.getvalue()
             excel_data = convert_single_row(result)
             st.download_button(
                 label="📥 下载单条结果Excel",

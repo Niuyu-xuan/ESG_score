@@ -41,7 +41,7 @@ st.set_page_config(
     }
 )
 
-# 自定义CSS样式（已替换为宋体）
+# 自定义CSS样式
 st.markdown("""
 <style>
     /* 全局字体：优先使用宋体，兼容Windows系统 */
@@ -143,11 +143,11 @@ PROJECT_LIST = [
     "碳排放量或减排量披露"
 ]
 
-# ESG主题配色方案
-ESG_COLORS = px.colors.sequential.Greens
-MAIN_COLOR = "#10B981"
+# ================= 修改点1：更新为更深的ESG绿色配色方案 =================
+ESG_COLORS = px.colors.sequential.Greens[3:]  # 跳过前3个最浅的绿色
+MAIN_COLOR = "#059669"  # 主色从#10B981改为更深的绿色
 
-# ================= 2. 辅助函数（已修复：生成标准Markdown列表）=================
+# ================= 2. 辅助函数 =================
 def format_esg_text(text):
     """将按分号分隔的长文本自动拆分为标准Markdown无序列表，同时支持中英文分号"""
     if pd.isna(text) or str(text).strip() == "":
@@ -240,7 +240,6 @@ if page == "📝 PDF自动打分":
     api_key = st.text_input(
         "NVIDIA API Key", 
         type="password",
-        value="nvapi-",
         help="你的NVIDIA API密钥，用于调用GPT-OSS-120B模型"
     )
     
@@ -427,7 +426,7 @@ if page == "📝 PDF自动打分":
                 use_container_width=True
             )
 
-# --- 页面 1: 企业详情查询（保持原样）---
+# --- 页面 1: 企业详情查询 ---
 elif page == "📄 企业详情查询":
     st.title("企业ESG报告碳披露详情")
     
@@ -489,7 +488,7 @@ elif page == "📄 企业详情查询":
                 dimension_colors = {
                     0: 'background-color: #F0FDF4; color: #1F2937',
                     1: 'background-color: #6EE7B7; color: #065F46',
-                    2: 'background-color: #10B981; color: white'
+                    2: 'background-color: #059669; color: white'
                 }
                 
                 for col in PROJECT_LIST:
@@ -502,7 +501,7 @@ elif page == "📄 企业详情查询":
                     '待改进': 'background-color: #F3F4F6; color: #1F2937',
                     '合格': 'background-color: #D1FAE5; color: #065F46',
                     '良好': 'background-color: #6EE7B7; color: #065F46',
-                    '优秀': 'background-color: #10B981; color: white'
+                    '优秀': 'background-color: #059669; color: white'
                 }
                 
                 rating = row['评级']
@@ -540,7 +539,7 @@ elif page == "📄 企业详情查询":
             )
             
             # --------------------------
-            # 模块2: 多维度趋势折线图
+            # 模块2: 多维度趋势折线图（已修改：加深线条颜色和宽度）
             # --------------------------
             st.subheader("📈 多维度得分趋势对比")
             
@@ -584,18 +583,29 @@ elif page == "📄 企业详情查询":
                         yanchor="bottom",
                         y=1.02,
                         xanchor="right",
-                        x=1
+                        x=1,
+                        font=dict(color='#1F2937')  # 图例文字加深
                     ),
                     xaxis=dict(
                         tickmode='array',
                         tickvals=company_data['year'].unique(),
                         ticktext=company_data['year'].unique().astype(str),
-                        gridcolor='#F0F0F0'
+                        gridcolor='#F0F0F0',
+                        tickfont=dict(color='#1F2937'),  # X轴刻度文字加深
+                        title_font=dict(color='#1F2937')
                     ),
-                    yaxis=dict(gridcolor='#F0F0F0')
+                    yaxis=dict(
+                        gridcolor='#F0F0F0',
+                        tickfont=dict(color='#1F2937'),  # Y轴刻度文字加深
+                        title_font=dict(color='#1F2937')
+                    )
                 )
                 
-                fig_multi.update_traces(line=dict(width=3), marker=dict(size=8))
+                # ================= 修改点2：加深折线颜色并增加宽度 =================
+                fig_multi.update_traces(
+                    line=dict(width=4),  # 线条宽度从3px增加到4px
+                    marker=dict(size=10, line=dict(width=2, color='white'))  # 标记点加白边更清晰
+                )
                 
                 st.plotly_chart(fig_multi, use_container_width=True)
             
@@ -649,7 +659,9 @@ elif page == "📄 企业详情查询":
                 </div>
                 """, unsafe_allow_html=True)
             
-            # 雷达图
+            # --------------------------
+            # 雷达图（已修改：加深所有文字颜色）
+            # --------------------------
             st.subheader(f"🎯 {selected_year_value}年 各维度得分雷达图")
             col1, col2 = st.columns([1, 1])
             
@@ -676,19 +688,24 @@ elif page == "📄 企业详情查询":
                     name='得分率',
                     hovertext=radar_df['得分'],
                     hoverinfo='text+theta+r',
-                    line=dict(color=MAIN_COLOR, width=2),
-                    fillcolor='rgba(16, 185, 129, 0.3)'
+                    line=dict(color=MAIN_COLOR, width=3),  # 雷达图线条也加深
+                    fillcolor='rgba(5, 150, 105, 0.3)'  # 填充色也对应加深
                 ))
                 
+                # ================= 修改点3：加深雷达图所有文字颜色 =================
                 fig_radar.update_layout(
                     polar=dict(
                         radialaxis=dict(
                             visible=True,
                             range=[0, 1],
                             tickformat='.0%',
-                            gridcolor='#F0F0F0'
+                            gridcolor='#E5E7EB',
+                            tickfont=dict(color='#1F2937', size=12)  # 径向刻度文字加深
                         ),
-                        angularaxis=dict(gridcolor='#F0F0F0')
+                        angularaxis=dict(
+                            gridcolor='#E5E7EB',
+                            tickfont=dict(color='#1F2937', size=12)  # 角度标签文字加深
+                        )
                     ),
                     plot_bgcolor='white',
                     paper_bgcolor='white',
@@ -731,7 +748,7 @@ elif page == "📄 企业详情查询":
                     st.markdown(f"**证据**: {year_data[col_evidence]}")
             
             # --------------------------
-            # 综合评价与建议（已修复：标题和内容分开显示）
+            # 综合评价与建议
             # --------------------------
             st.subheader(f"💡 {selected_year_value}年 综合评价与建议")
             col1, col2, col3 = st.columns(3)
@@ -751,7 +768,7 @@ elif page == "📄 企业详情查询":
                 st.info("### 📌 改进建议")
                 st.markdown(formatted_suggestion)
 
-# --- 页面 2: 四象限对标分析（已修改：排名格式改为"排名/总数"）---
+# --- 页面 2: 四象限对标分析 ---
 elif page == "📊 四象限对标分析":
     st.title("经济绩效与碳披露绩效四象限分析")
     
@@ -810,7 +827,7 @@ elif page == "📊 四象限对标分析":
                 if len(peer_df) < 2:
                     st.warning(f"⚠️ 该行业({industry})当年样本量不足2家，无法进行有效对比分析")
                 else:
-                    # ================= 核心修改：计算排名/总数格式 =================
+                    # 计算排名/总数格式
                     # 1. 计算财务指标排名（数值越高越好，所以降序排列）
                     peer_df_sorted_econ = peer_df.sort_values(by=ECON_INDICATOR_CODE, ascending=False).reset_index(drop=True)
                     econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1  # 排名从1开始
@@ -951,8 +968,16 @@ elif page == "📊 四象限对标分析":
                         paper_bgcolor='white',
                         title_font=dict(size=18, color='#065F46'),
                         showlegend=False,
-                        xaxis=dict(gridcolor='#F0F0F0'),
-                        yaxis=dict(gridcolor='#F0F0F0')
+                        xaxis=dict(
+                            gridcolor='#F0F0F0',
+                            tickfont=dict(color='#1F2937'),
+                            title_font=dict(color='#1F2937')
+                        ),
+                        yaxis=dict(
+                            gridcolor='#F0F0F0',
+                            tickfont=dict(color='#1F2937'),
+                            title_font=dict(color='#1F2937')
+                        )
                     )
                     
                     st.plotly_chart(fig, use_container_width=True)

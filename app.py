@@ -4,8 +4,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 import os
+import sys
+import json
+from io import BytesIO
+import pdfplumber
+import time
+import requests
 
-# 简单的密码验证
+# ================= 0. 简单的密码验证 =================
 def check_password():
     """返回用户是否输入了正确的密码"""
     if "password_correct" not in st.session_state:
@@ -15,7 +21,7 @@ def check_password():
         st.title("🔐 登录")
         password = st.text_input("请输入访问密码", type="password")
         
-        # 这里设置你想要的密码，比如和老师一样：ai4finance
+        # 这里设置你想要的密码
         if password == "ESG123":
             st.session_state.password_correct = True
             st.rerun()
@@ -143,28 +149,124 @@ PROJECT_LIST = [
     "碳排放量或减排量披露"
 ]
 
-# ================= 修改点1：更新为更深的ESG绿色配色方案 =================
-ESG_COLORS = px.colors.sequential.Greens[3:]  # 跳过前3个最浅的绿色
-MAIN_COLOR = "#059669"  # 主色从#10B981改为更深的绿色
+# ESG绿色配色方案（加深版）
+ESG_COLORS = px.colors.sequential.Greens[3:]
+MAIN_COLOR = "#059669"
 
 # ================= 2. 辅助函数 =================
 def format_esg_text(text):
-    """将按分号分隔的长文本自动拆分为标准Markdown无序列表，同时支持中英文分号"""
+    """将按分号分隔的长文本自动拆分为标准Markdown无序列表"""
     if pd.isna(text) or str(text).strip() == "":
         return "暂无"
     
-    # 先把所有英文分号替换成中文分号，统一处理
     unified_text = str(text).replace(';', '；')
-    
-    # 按中文分号分割，去掉前后空格，过滤空字符串
     items = [item.strip() for item in unified_text.split("；") if item.strip()]
-    
-    # 格式化为标准Markdown无序列表（用-开头，Streamlit解析最可靠）
     formatted = "\n".join([f"- {item}" for item in items])
-    
     return formatted
 
-# ================= 3. 侧边栏：文件上传 + 导航 =================
+# ================= 3. 打分核心函数（直接合并到这里，避免导入问题）=================
+def simple_score_pdf(pdf_file, api_key, company_name, report_year, 
+                     industry_code, extra_finance_data=None):
+    """
+    简化版打分接口
+    """
+    # 1. 在内存中解析PDF文本
+    full_text = ""
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            t = page.extract_text()
+            if t:
+                full_text += t + "\n"
+    
+    # 2. 导入version5的核心类
+    from version5 import ESGCarbonScoringSystem
+    
+    # 初始化打分系统
+    scorer = ESGCarbonScoringSystem(
+        api_key=api_key,
+        base_url="https://integrate.api.nvidia.com/v1",
+        model="openai/gpt-oss-120b"
+    )
+    
+    # 3. 调用打分
+    result = scorer.score_esg_report(
+        esg_text=full_text,
+        company_name=company_name,
+        report_year=str(report_year),
+        row_data={},
+        temperature=0.0
+    )
+    
+    if not result:
+        raise Exception("AI模型返回空结果，请检查API密钥或网络连接")
+    
+    # 4. 转换为标准格式
+    scoring_json = result['scoring_result']
+    details = scoring_json.get('scoring_details', {})
+    
+    final_row = {}
+    final_row['code'] = ""
+    final_row['公司名称'] = company_name
+    final_row['year'] = int(report_year)
+    final_row['industrycodec'] = industry_code
+    final_row['报告名称'] = f"{company_name} {report_year}年ESG报告"
+    
+    # 5. 提取10个项目的得分
+    item_dict = {}
+    for dim_data in details.values():
+        for item in dim_data.get('items', []):
+            item_dict[item['name']] = item
+    
+    for proj_name in PROJECT_LIST:
+        if proj_name in item_dict:
+            item = item_dict[proj_name]
+            final_row[f"项目_{proj_name}_得分"] = item['score']
+            final_row[f"项目_{proj_name}_满分"] = item['max_score']
+            final_row[f"项目_{proj_name}_评分理由"] = item['reason']
+            final_row[f"项目_{proj_name}_证据"] = item['evidence']
+        else:
+            final_row[f"项目_{proj_name}_得分"] = 0
+            final_row[f"项目_{proj_name}_满分"] = 2
+            final_row[f"项目_{proj_name}_评分理由"] = "未披露相关内容"
+            final_row[f"项目_{proj_name}_证据"] = ""
+    
+    # 6. 最终得分和评级
+    final_row['最终得分'] = scoring_json.get('final_score', 0)
+    final_row['评级'] = scoring_json.get('score_level', '待改进')
+    
+    # 7. 综合评价
+    summary = scoring_json.get('summary', {})
+    final_row['综合评价'] = summary.get('comprehensive_evaluation', '')
+    
+    # 处理列表转中文分号
+    adv = summary.get('core_advantages', [])
+    if adv == ["无"]:
+        final_row['核心优势'] = "无"
+    else:
+        cleaned_adv = [item.replace(';', '；') for item in adv]
+        final_row['核心优势'] = "；".join(cleaned_adv)
+
+    iss = summary.get('core_issues', [])
+    if iss == ["无"]:
+        final_row['核心问题'] = "无"
+    else:
+        cleaned_iss = [item.replace(';', '；') for item in iss]
+        final_row['核心问题'] = "；".join(cleaned_iss)
+
+    sug = summary.get('improvement_suggestions', [])
+    if sug == ["无"]:
+        final_row['改进建议'] = "无"
+    else:
+        cleaned_sug = [item.replace(';', '；') for item in sug]
+        final_row['改进建议'] = "；".join(cleaned_sug)
+    
+    # 8. 补充财务指标
+    if extra_finance_data:
+        final_row.update(extra_finance_data)
+    
+    return final_row
+
+# ================= 4. 侧边栏：文件上传 + 导航 =================
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/leaf.png", width=80)
     st.title("🌿 ESG碳披露分析")
@@ -173,7 +275,6 @@ with st.sidebar:
     st.subheader("📁 数据上传")
     uploaded_file = st.file_uploader("上传Excel数据文件", type=["xlsx", "xls"])
     
-    # 全局数据变量（使用session_state保存，支持修改）
     if 'df' not in st.session_state:
         st.session_state.df = None
     
@@ -184,7 +285,6 @@ with st.sidebar:
             df['code'] = df['code'].astype(str).str.strip()
             df['year'] = df['year'].astype(int)
             
-            # 自动修复历史数据中的英文分号
             for col in ['核心优势', '核心问题', '改进建议']:
                 if col in df.columns:
                     df[col] = df[col].astype(str).str.replace(';', '；')
@@ -211,7 +311,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-# 未上传文件时显示欢迎界面（PDF打分页面无需上传Excel也可使用）
+# 未上传文件时显示欢迎界面
 if st.session_state.df is None and page != "📝 PDF自动打分":
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -228,12 +328,12 @@ if st.session_state.df is None and page != "📝 PDF自动打分":
         st.info("👈 请先在左侧边栏上传你的Excel数据文件")
         st.stop()
 
-# ================= 4. 页面实现 =================
+# ================= 5. 页面实现 =================
 
-# --- 页面 3: 新增 - PDF自动打分（适配version5.py）---
+# --- 页面 3: PDF自动打分 ---
 if page == "📝 PDF自动打分":
     st.title("ESG报告PDF自动打分")
-    st.markdown("上传企业ESG报告PDF文件，系统将自动调用version5.py进行碳披露评分并生成分析报告")
+    st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成分析报告")
     
     # 1. API密钥输入
     st.subheader("🔑 API配置")
@@ -265,7 +365,7 @@ if page == "📝 PDF自动打分":
     
     st.divider()
     
-    # 4. 财务指标输入（用于四象限分析）
+    # 4. 财务指标输入
     st.subheader("💰 3. 补充财务指标（选填）")
     st.info("如果不填写，打分后无法进行四象限分析，但不影响详情查询功能")
     
@@ -281,7 +381,6 @@ if page == "📝 PDF自动打分":
     with col5:
         f051201b = st.number_input("投入资本回报率 (ROIC)", format="%.4f", help="F051201B")
     
-    # 打包财务数据
     finance_data = {
         'F050201B': f050201b,
         'F050501B': f050501b,
@@ -303,10 +402,7 @@ if page == "📝 PDF自动打分":
         else:
             try:
                 with st.spinner("正在解析PDF并调用AI模型打分（预计需要3-10分钟，请耐心等待）..."):
-                    # 导入适配器（延迟导入，避免启动时错误）
-                    from scoring_adapter import simple_score_pdf
-                    
-                    # 调用打分函数
+                    # 直接调用本文件中的函数
                     result_row = simple_score_pdf(
                         pdf_file=pdf_file,
                         api_key=api_key,
@@ -316,28 +412,22 @@ if page == "📝 PDF自动打分":
                         extra_finance_data=finance_data
                     )
                     
-                    # 补充股票代码
                     result_row['code'] = stock_code
-                    
-                    # 保存结果到session_state
                     st.session_state.latest_score = result_row
-                    
                     st.success("✅ 打分完成！")
             
             except Exception as e:
                 st.error(f"❌ 打分失败：{str(e)}")
                 st.info("💡 请检查：1. API Key是否正确 2. PDF是否可读取 3. 网络连接是否正常")
     
-    # 6. 显示打分结果并提供保存/下载
+    # 6. 显示打分结果
     if 'latest_score' in st.session_state:
         result = st.session_state.latest_score
         
         st.divider()
         st.subheader("📊 打分结果预览")
         
-        # 显示核心指标卡片
         col1, col2, col3, col4 = st.columns(4)
-        
         with col1:
             st.markdown(f"""
             <div class="metric-card">
@@ -345,7 +435,6 @@ if page == "📝 PDF自动打分":
                 <p style="font-size:1.2rem; font-weight:700; margin:0; color:#10B981;">{result['公司名称']}</p>
             </div>
             """, unsafe_allow_html=True)
-        
         with col2:
             st.markdown(f"""
             <div class="metric-card">
@@ -353,7 +442,6 @@ if page == "📝 PDF自动打分":
                 <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['year']}</p>
             </div>
             """, unsafe_allow_html=True)
-        
         with col3:
             st.markdown(f"""
             <div class="metric-card">
@@ -361,7 +449,6 @@ if page == "📝 PDF自动打分":
                 <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['最终得分']}/20</p>
             </div>
             """, unsafe_allow_html=True)
-        
         with col4:
             st.markdown(f"""
             <div class="metric-card">
@@ -370,7 +457,6 @@ if page == "📝 PDF自动打分":
             </div>
             """, unsafe_allow_html=True)
         
-        # 显示10个维度得分
         st.subheader("各维度得分明细")
         score_data = []
         for proj in PROJECT_LIST:
@@ -383,14 +469,12 @@ if page == "📝 PDF自动打分":
         score_df = pd.DataFrame(score_data)
         st.dataframe(score_df, use_container_width=True, hide_index=True)
         
-        # 保存和下载按钮
         st.divider()
         col1, col2 = st.columns(2)
         
         with col1:
             if st.button("💾 仅保存到当前会话（不修改原始文件）", use_container_width=True):
                 if st.session_state.df is not None:
-                    # 1. 先删除同一个企业同一年份的所有旧记录（避免同一会话中重复）
                     company_code_val = result['code']
                     report_year_val = result['year']
                     
@@ -401,7 +485,6 @@ if page == "📝 PDF自动打分":
                         st.session_state.df = st.session_state.df[~mask].reset_index(drop=True)
                         st.info(f"ℹ️ 已覆盖当前会话中该企业 {report_year_val} 年的 {old_count} 条旧记录")
                     
-                    # 2. 追加新的打分结果到内存中
                     new_row = pd.DataFrame([result])
                     st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
                     
@@ -412,12 +495,12 @@ if page == "📝 PDF自动打分":
                     st.warning("⚠️ 未上传Excel数据集，仅生成结果预览")
         
         with col2:
-            # 提供单条结果下载（修复TypeError）
-            @st.cache_data
+            # 提供单条结果下载（彻底修复所有错误）
             def convert_single_row(row):
                 output = BytesIO()
                 pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
                 return output.getvalue()
+            
             excel_data = convert_single_row(result)
             st.download_button(
                 label="📥 下载单条结果Excel",
@@ -431,7 +514,6 @@ if page == "📝 PDF自动打分":
 elif page == "📄 企业详情查询":
     st.title("企业ESG报告碳披露详情")
     
-    # 公司代码输入
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         input_code = st.text_input(
@@ -450,7 +532,6 @@ elif page == "📄 企业详情查询":
             company_name = company_data['公司名称'].iloc[0]
             industry_code = company_data['industrycodec'].iloc[0]
             
-            # 企业概览卡片
             st.markdown(f"""
             <div class="metric-card">
                 <h2 style="margin-top:0; border-bottom:none;">🏢 企业概览</h2>
@@ -467,7 +548,6 @@ elif page == "📄 企业详情查询":
             # --------------------------
             st.subheader("📋 历年各维度得分总览")
 
-            # 构建数据
             full_data = []
             for _, row in company_data.iterrows():
                 year_row = {
@@ -481,11 +561,8 @@ elif page == "📄 企业详情查询":
             
             full_df = pd.DataFrame(full_data).set_index('年份')
             
-            # 自定义颜色规则函数
             def custom_color_style(row):
                 styles = pd.Series('', index=row.index)
-                
-                # 维度得分颜色
                 dimension_colors = {
                     0: 'background-color: #F0FDF4; color: #1F2937',
                     1: 'background-color: #6EE7B7; color: #065F46',
@@ -497,7 +574,6 @@ elif page == "📄 企业详情查询":
                     if score in dimension_colors:
                         styles[col] = dimension_colors[score]
                 
-                # 最终得分颜色（按评级）
                 rating_colors = {
                     '待改进': 'background-color: #F3F4F6; color: #1F2937',
                     '合格': 'background-color: #D1FAE5; color: #065F46',
@@ -511,19 +587,13 @@ elif page == "📄 企业详情查询":
                 
                 return styles
 
-            # 应用样式
             styled_df = full_df.style.apply(custom_color_style, axis=1)
-            
-            # 去掉评级列显示
             display_df = styled_df.data.drop(columns=['评级'])
-            
-            # 重新应用样式
             final_styled = display_df.style.apply(
                 lambda row: custom_color_style(full_df.loc[row.name]).drop('评级'), 
                 axis=1
             )
             
-            # 美化表格
             final_styled = final_styled.set_properties(**{
                 'text-align': 'center',
                 'font-weight': '500',
@@ -532,7 +602,6 @@ elif page == "📄 企业详情查询":
                 {'selector': 'th', 'props': [('background-color', '#F9FAFB'), ('font-weight', '600')]}
             ])
 
-            # 显示表格
             st.dataframe(
                 final_styled,
                 use_container_width=True,
@@ -540,7 +609,7 @@ elif page == "📄 企业详情查询":
             )
             
             # --------------------------
-            # 模块2: 多维度趋势折线图（已修改：加深线条颜色和宽度）
+            # 模块2: 多维度趋势折线图
             # --------------------------
             st.subheader("📈 多维度得分趋势对比")
             
@@ -564,7 +633,6 @@ elif page == "📄 企业详情查询":
                 
                 plot_df = pd.DataFrame(plot_data)
                 
-                # 美化折线图
                 fig_multi = px.line(
                     plot_df,
                     x='年份',
@@ -585,27 +653,26 @@ elif page == "📄 企业详情查询":
                         y=1.02,
                         xanchor="right",
                         x=1,
-                        font=dict(color='#1F2937')  # 图例文字加深
+                        font=dict(color='#1F2937')
                     ),
                     xaxis=dict(
                         tickmode='array',
                         tickvals=company_data['year'].unique(),
                         ticktext=company_data['year'].unique().astype(str),
                         gridcolor='#F0F0F0',
-                        tickfont=dict(color='#1F2937'),  # X轴刻度文字加深
+                        tickfont=dict(color='#1F2937'),
                         title_font=dict(color='#1F2937')
                     ),
                     yaxis=dict(
                         gridcolor='#F0F0F0',
-                        tickfont=dict(color='#1F2937'),  # Y轴刻度文字加深
+                        tickfont=dict(color='#1F2937'),
                         title_font=dict(color='#1F2937')
                     )
                 )
                 
-                # ================= 修改点2：加深折线颜色并增加宽度 =================
                 fig_multi.update_traces(
-                    line=dict(width=4),  # 线条宽度从3px增加到4px
-                    marker=dict(size=10, line=dict(width=2, color='white'))  # 标记点加白边更清晰
+                    line=dict(width=4),
+                    marker=dict(size=10, line=dict(width=2, color='white'))
                 )
                 
                 st.plotly_chart(fig_multi, use_container_width=True)
@@ -624,7 +691,6 @@ elif page == "📄 企业详情查询":
             
             year_data = company_data[company_data['year'] == selected_year_value].iloc[0]
             
-            # 核心指标卡片
             st.subheader(f"📊 {selected_year_value}年 核心指标")
             col1, col2, col3, col4 = st.columns(4)
             
@@ -661,7 +727,7 @@ elif page == "📄 企业详情查询":
                 """, unsafe_allow_html=True)
             
             # --------------------------
-            # 雷达图（已修改：加深所有文字颜色）
+            # 雷达图
             # --------------------------
             st.subheader(f"🎯 {selected_year_value}年 各维度得分雷达图")
             col1, col2 = st.columns([1, 1])
@@ -689,11 +755,10 @@ elif page == "📄 企业详情查询":
                     name='得分率',
                     hovertext=radar_df['得分'],
                     hoverinfo='text+theta+r',
-                    line=dict(color=MAIN_COLOR, width=3),  # 雷达图线条也加深
-                    fillcolor='rgba(5, 150, 105, 0.3)'  # 填充色也对应加深
+                    line=dict(color=MAIN_COLOR, width=3),
+                    fillcolor='rgba(5, 150, 105, 0.3)'
                 ))
                 
-                # ================= 修改点3：加深雷达图所有文字颜色 =================
                 fig_radar.update_layout(
                     polar=dict(
                         radialaxis=dict(
@@ -701,11 +766,11 @@ elif page == "📄 企业详情查询":
                             range=[0, 1],
                             tickformat='.0%',
                             gridcolor='#E5E7EB',
-                            tickfont=dict(color='#1F2937', size=12)  # 径向刻度文字加深
+                            tickfont=dict(color='#1F2937', size=12)
                         ),
                         angularaxis=dict(
                             gridcolor='#E5E7EB',
-                            tickfont=dict(color='#1F2937', size=12)  # 角度标签文字加深
+                            tickfont=dict(color='#1F2937', size=12)
                         )
                     ),
                     plot_bgcolor='white',
@@ -726,11 +791,9 @@ elif page == "📄 企业详情查询":
                 st.write("• 越靠近边缘表示该维度披露越充分")
                 st.write("• 越靠近中心表示该维度披露越不足")
                 
-                # 计算平均分
                 avg_rate = radar_df['得分率'].mean()
                 st.metric("平均得分率", f"{avg_rate:.1%}")
             
-            # 详细评分明细
             st.subheader(f"📝 {selected_year_value}年 详细评分明细")
             
             for proj_name in PROJECT_LIST:
@@ -748,9 +811,6 @@ elif page == "📄 企业详情查询":
                     st.markdown(f"**评分理由**: {year_data[col_reason]}")
                     st.markdown(f"**证据**: {year_data[col_evidence]}")
             
-            # --------------------------
-            # 综合评价与建议
-            # --------------------------
             st.subheader(f"💡 {selected_year_value}年 综合评价与建议")
             col1, col2, col3 = st.columns(3)
             
@@ -773,7 +833,6 @@ elif page == "📄 企业详情查询":
 elif page == "📊 四象限对标分析":
     st.title("经济绩效与碳披露绩效四象限分析")
     
-    # 经济指标选择
     st.subheader("📌 分析指标设置")
     col1, col2 = st.columns(2)
     
@@ -801,7 +860,6 @@ elif page == "📊 四象限对标分析":
             value=2023
         )
     
-    # 公司代码输入
     input_code = st.text_input(
         "请输入公司代码", 
         placeholder="例如：600759"
@@ -819,7 +877,6 @@ elif page == "📊 四象限对标分析":
                 target = target_df.iloc[0]
                 industry = target['industrycodec']
                 
-                # 筛选同行业同年数据
                 peer_df = st.session_state.df[
                     (st.session_state.df['industrycodec'] == industry) & 
                     (st.session_state.df['year'] == input_year)
@@ -828,18 +885,14 @@ elif page == "📊 四象限对标分析":
                 if len(peer_df) < 2:
                     st.warning(f"⚠️ 该行业({industry})当年样本量不足2家，无法进行有效对比分析")
                 else:
-                    # 计算排名/总数格式
-                    # 1. 计算财务指标排名（数值越高越好，所以降序排列）
                     peer_df_sorted_econ = peer_df.sort_values(by=ECON_INDICATOR_CODE, ascending=False).reset_index(drop=True)
-                    econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1  # 排名从1开始
+                    econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1
                     econ_total = len(peer_df_sorted_econ)
                     
-                    # 2. 计算碳披露得分排名（数值越高越好，降序排列）
                     peer_df_sorted_carbon = peer_df.sort_values(by='最终得分', ascending=False).reset_index(drop=True)
                     carbon_rank = (peer_df_sorted_carbon['code'] == target['code']).idxmax() + 1
                     carbon_total = len(peer_df_sorted_carbon)
                     
-                    # 结果卡片
                     st.divider()
                     st.subheader("📊 对标结果")
                     col1, col2, col3 = st.columns(3)
@@ -868,7 +921,6 @@ elif page == "📊 四象限对标分析":
                         </div>
                         """, unsafe_allow_html=True)
                     
-                    # 象限判定
                     median_econ = peer_df[ECON_INDICATOR_CODE].median()
                     median_carbon = peer_df['最终得分'].median()
                     
@@ -891,7 +943,6 @@ elif page == "📊 四象限对标分析":
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 绘制四象限图
                     fig = px.scatter(
                         peer_df,
                         x=ECON_INDICATOR_CODE,
@@ -906,7 +957,6 @@ elif page == "📊 四象限对标分析":
                         color_discrete_sequence=['#94A3B8']
                     )
                     
-                    # 添加目标企业
                     fig.add_scatter(
                         x=[target[ECON_INDICATOR_CODE]],
                         y=[target['最终得分']],
@@ -918,7 +968,6 @@ elif page == "📊 四象限对标分析":
                         textfont=dict(size=14, color='#EF4444', weight='bold')
                     )
                     
-                    # 添加中位数线
                     fig.add_vline(
                         x=median_econ, 
                         line_dash="dash", 
@@ -934,7 +983,6 @@ elif page == "📊 四象限对标分析":
                         line_width=2
                     )
                     
-                    # 添加象限标签
                     fig.add_annotation(
                         x=peer_df[ECON_INDICATOR_CODE].max(),
                         y=peer_df['最终得分'].max(),

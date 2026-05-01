@@ -472,27 +472,38 @@ if page == "📝 PDF自动打分":
         st.divider()
         col1, col2 = st.columns(2)
         
+        # ======================
+        # ✅ 修改后的保存按钮：自动去重 + 合并到已上传数据集
+        # ======================
         with col1:
-            if st.button("💾 仅保存到当前会话（不修改原始文件）", use_container_width=True):
-                if st.session_state.df is not None:
-                    company_code_val = result['code']
-                    report_year_val = result['year']
-                    
-                    mask = (st.session_state.df['code'] == company_code_val) & (st.session_state.df['year'] == report_year_val)
-                    old_count = mask.sum()
-                    
-                    if old_count > 0:
-                        st.session_state.df = st.session_state.df[~mask].reset_index(drop=True)
-                        st.info(f"ℹ️ 已覆盖当前会话中该企业 {report_year_val} 年的 {old_count} 条旧记录")
-                    
-                    new_row = pd.DataFrame([result])
-                    st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
-                    
-                    st.success("✅ 已保存到当前会话！")
-                    st.info("💡 提示：关闭页面后新数据将自动清空，原始Excel文件保持不变")
-                    st.info(f"现在你可以在【企业详情查询】页面输入股票代码 {stock_code} 查看完整分析")
+            if st.button("💾 自动去重 → 合并到我的小样本", use_container_width=True):
+                if st.session_state.df is None:
+                    st.warning("请先在左侧上传你的小样本Excel")
                 else:
-                    st.warning("⚠️ 未上传Excel数据集，仅生成结果预览")
+                    # 1. 提取新行的关键信息
+                    code = result['code']
+                    year = result['year']
+                    df = st.session_state.df
+
+                    # 2. 👇 自动去重：同 code + year 删掉旧的
+                    mask = (df['code'] == code) & (df['year'] == year)
+                    old_num = mask.sum()
+                    df_new = df[~mask].copy()
+
+                    # 3. 追加新行
+                    new_row = pd.DataFrame([result])
+                    df_final = pd.concat([df_new, new_row], ignore_index=True)
+
+                    # 4. 更新回 session_state
+                    st.session_state.df = df_final
+                    
+                    # 5. 友好提示
+                    if old_num > 0:
+                        st.success(f"✅ 已自动覆盖重复数据 | 原{old_num}条 → 已更新")
+                    else:
+                        st.success("✅ 已新增并合并到小样本")
+                    st.info(f"当前总数据：{len(st.session_state.df)} 条")
+                    st.info("现在可以去「企业详情查询」使用这条新数据")
         
         with col2:
             # 提供单条结果下载（彻底修复所有错误）

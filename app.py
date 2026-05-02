@@ -31,7 +31,6 @@ def check_password():
     else:
         return True
 
-# 执行密码检查
 if not check_password():
     st.stop()
 
@@ -266,7 +265,7 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     
     return final_row
 
-# ================= 4. 侧边栏：自动读取本地小样本.xlsx（Streamlit兼容版） =================
+# ================= 4. 全局数据加载（小样本 + A股财务数据） =================
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/leaf.png", width=80)
     st.title("🌿 ESG碳披露分析")
@@ -276,6 +275,9 @@ with st.sidebar:
 
     if 'df' not in st.session_state:
         st.session_state.df = None
+    
+    if 'finance_df' not in st.session_state:
+        st.session_state.finance_df = None
 
     @st.cache_data
     def load_local_excel():
@@ -292,19 +294,42 @@ with st.sidebar:
                     df[col] = df[col].astype(str).str.replace(';', '；')
             return df
         except Exception as e:
-            st.error(f"文件加载失败：{str(e)}")
+            st.error(f"小样本加载失败：{str(e)}")
             return None
 
+    @st.cache_data
+    def load_finance_data():
+        try:
+            # ✅ 加载A股全市场财务数据
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            finance_path = os.path.join(current_dir, "A股财务指标.xlsx")  # 👈 你的财务数据文件名
+            
+            finance_df = pd.read_excel(finance_path)
+            # 统一数据类型，确保匹配
+            finance_df['code'] = finance_df['code'].astype(str).str.strip()
+            finance_df['year'] = finance_df['year'].astype(int)
+            return finance_df
+        except Exception as e:
+            st.warning(f"财务数据加载失败：{str(e)}，将使用手动输入模式")
+            return None
+
+    # 加载数据
     st.session_state.df = load_local_excel()
+    st.session_state.finance_df = load_finance_data()
 
     if st.session_state.df is not None:
-        st.success(f"✅ 本地小样本已加载！共 {len(st.session_state.df)} 条记录")
+        st.success(f"✅ 小样本已加载：{len(st.session_state.df)} 条记录")
         with st.expander("🔍 查看可用公司代码"):
             unique_codes = sorted(st.session_state.df['code'].unique())
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
         st.warning(f"ℹ️ 未找到小样本.xlsx，仅可使用PDF打分功能")
+    
+    if st.session_state.finance_df is not None:
+        st.success(f"✅ 财务数据已加载：{len(st.session_state.finance_df)} 条记录")
+    else:
+        st.info("ℹ️ 未找到A股财务指标.xlsx，将使用手动输入模式")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -333,7 +358,7 @@ if st.session_state.df is None and page != "📝 PDF自动打分":
 
 # ================= 5. 页面实现 =================
 
-# --- 页面 3: PDF自动打分 ---
+# --- 页面 3: PDF自动打分（新增自动获取财务数据功能） ---
 if page == "📝 PDF自动打分":
     st.title("ESG报告PDF自动打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成分析报告")
@@ -366,23 +391,88 @@ if page == "📝 PDF自动打分":
     with col4:
         industry_code = st.text_input("行业代码 (industrycodec)", placeholder="例如：B07")
     
+    # ✅ 新增：自动获取财务数据按钮
+    if st.session_state.finance_df is not None:
+        if st.button("🔍 自动获取财务数据", use_container_width=True):
+            if not stock_code or not report_year:
+                st.error("请先填写股票代码和报告年份")
+            else:
+                # 查找匹配的财务数据
+                finance_df = st.session_state.finance_df
+                match = finance_df[
+                    (finance_df['code'] == str(stock_code).strip()) & 
+                    (finance_df['year'] == int(report_year))
+                ]
+                
+                if match.empty:
+                    st.warning(f"未找到代码 {stock_code} 在 {report_year} 年的财务数据，请手动输入")
+                else:
+                    # 提取匹配的第一条记录
+                    finance_data = match.iloc[0]
+                    st.success(f"✅ 成功获取 {stock_code} {report_year} 年财务数据！")
+                    
+                    # 自动填充到session_state，刷新页面后显示
+                    st.session_state.auto_finance = {
+                        'F050201B': finance_data.get('F050201B', 0.0),
+                        'F050501B': finance_data.get('F050501B', 0.0),
+                        'F051501B': finance_data.get('F051501B', 0.0),
+                        'F053301B': finance_data.get('F053301B', 0.0),
+                        'F051201B': finance_data.get('F051201B', 0.0)
+                    }
+                    st.rerun()
+    
     st.divider()
     
-    # 4. 财务指标输入
-    st.subheader("💰 3. 补充财务指标（选填）")
-    st.info("如果不填写，打分后无法进行四象限分析，但不影响详情查询功能")
+    # 4. 财务指标输入（支持自动填充）
+    st.subheader("💰 3. 财务指标")
+    st.info("已加载A股全市场财务数据，输入代码和年份后点击「自动获取财务数据」即可自动填充")
+    
+    # 初始化自动填充的财务数据
+    if 'auto_finance' not in st.session_state:
+        st.session_state.auto_finance = {
+            'F050201B': 0.0,
+            'F050501B': 0.0,
+            'F051501B': 0.0,
+            'F053301B': 0.0,
+            'F051201B': 0.0
+        }
     
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        f050201b = st.number_input("总资产净利润率 (ROA)", format="%.4f", help="F050201B")
+        f050201b = st.number_input(
+            "总资产净利润率 (ROA)", 
+            format="%.4f", 
+            value=st.session_state.auto_finance['F050201B'],
+            help="F050201B"
+        )
     with col2:
-        f050501b = st.number_input("净资产收益率 (ROE)", format="%.4f", help="F050501B")
+        f050501b = st.number_input(
+            "净资产收益率 (ROE)", 
+            format="%.4f", 
+            value=st.session_state.auto_finance['F050501B'],
+            help="F050501B"
+        )
     with col3:
-        f051501b = st.number_input("营业净利率", format="%.4f", help="F051501B")
+        f051501b = st.number_input(
+            "营业净利率", 
+            format="%.4f", 
+            value=st.session_state.auto_finance['F051501B'],
+            help="F051501B"
+        )
     with col4:
-        f053301b = st.number_input("营业毛利率", format="%.4f", help="F053301B")
+        f053301b = st.number_input(
+            "营业毛利率", 
+            format="%.4f", 
+            value=st.session_state.auto_finance['F053301B'],
+            help="F053301B"
+        )
     with col5:
-        f051201b = st.number_input("投入资本回报率 (ROIC)", format="%.4f", help="F051201B")
+        f051201b = st.number_input(
+            "投入资本回报率 (ROIC)", 
+            format="%.4f", 
+            value=st.session_state.auto_finance['F051201B'],
+            help="F051201B"
+        )
     
     finance_data = {
         'F050201B': f050201b,
@@ -418,6 +508,14 @@ if page == "📝 PDF自动打分":
                     # ✅ 安全修复：新打分的code也转成字符串并去空格
                     result_row['code'] = str(stock_code).strip()
                     st.session_state.latest_score = result_row
+                    # 清空自动填充的财务数据，准备下一次使用
+                    st.session_state.auto_finance = {
+                        'F050201B': 0.0,
+                        'F050501B': 0.0,
+                        'F051501B': 0.0,
+                        'F053301B': 0.0,
+                        'F051201B': 0.0
+                    }
                     st.success("✅ 打分完成！")
             
             except Exception as e:
@@ -477,7 +575,7 @@ if page == "📝 PDF自动打分":
         col1, col2 = st.columns(2)
         
         # ======================
-        # ✅ 只改了这里：合并后强制刷新
+        # ✅ 合并数据功能
         # ======================
         with col1:
             if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):

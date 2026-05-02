@@ -472,6 +472,46 @@ if page == "📝 PDF自动打分":
             })
         score_df = pd.DataFrame(score_data)
         st.dataframe(score_df, use_container_width=True, hide_index=True)
+
+        # ======================
+        # ✅【修复】这里新增：完整文字评价输出（和第一个界面完全一样）
+        # ======================
+        st.divider()
+        st.subheader("📝 详细评分明细 & 文字评价")
+        for proj_name in PROJECT_LIST:
+            col_score = f"项目_{proj_name}_得分"
+            col_full = f"项目_{proj_name}_满分"
+            col_reason = f"项目_{proj_name}_评分理由"
+            col_evidence = f"项目_{proj_name}_证据"
+            
+            score_val = result[col_score]
+            full_val = result[col_full]
+            progress = score_val / full_val if full_val > 0 else 0
+            
+            with st.expander(f"{proj_name} ({score_val}/{full_val})"):
+                st.progress(progress, text=f"得分水平: {progress:.1%}")
+                st.markdown(f"**评分理由**: {result[col_reason]}")
+                st.markdown(f"**证据**: {result[col_evidence]}")
+
+        # 综合评价
+        st.subheader("📄 综合评价")
+        st.write(result.get('综合评价', '暂无评价'))
+
+        # 核心优势 / 问题 / 建议（和企业详情页完全一致样式）
+        st.subheader("💡 核心优势、问题与改进建议")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.success("### ✅ 核心优势")
+            st.markdown(format_esg_text(result.get('核心优势', '')))
+        with col2:
+            st.warning("### ⚠️ 核心问题")
+            st.markdown(format_esg_text(result.get('核心问题', '')))
+        with col3:
+            st.info("### 📌 改进建议")
+            st.markdown(format_esg_text(result.get('改进建议', '')))
+        # ======================
+        # ✅ 修复结束
+        # ======================
         
         st.divider()
         col1, col2 = st.columns(2)

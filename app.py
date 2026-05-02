@@ -266,44 +266,42 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     
     return final_row
 
-# ================= 4. 侧边栏：文件上传 + 导航 =================
+# ================= 4. 侧边栏：自动读取本地小样本.xlsx =================
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/leaf.png", width=80)
     st.title("🌿 ESG碳披露分析")
     st.divider()
     
-    st.subheader("📁 数据上传")
-    uploaded_file = st.file_uploader("上传Excel数据文件", type=["xlsx", "xls"])
-    
+    st.subheader("📁 数据已自动加载")
+    excel_path = "小样本.xlsx"
+
     if 'df' not in st.session_state:
         st.session_state.df = None
-    
-    if uploaded_file is not None:
-        @st.cache_data
-        def load_uploaded_data(file):
-            df = pd.read_excel(file)
-            # ✅ 安全修复：强制把code列转成字符串，并且去掉前后空格
+
+    @st.cache_data
+    def load_local_excel():
+        try:
+            df = pd.read_excel(excel_path)
             df['code'] = df['code'].astype(str).str.strip()
             df['year'] = df['year'].astype(int)
-            
             for col in ['核心优势', '核心问题', '改进建议']:
                 if col in df.columns:
                     df[col] = df[col].astype(str).str.replace(';', '；')
-            
             return df
-        
-        with st.spinner("正在加载数据..."):
-            st.session_state.df = load_uploaded_data(uploaded_file)
-        
-        st.success(f"✅ 加载成功！共 {len(st.session_state.df)} 条记录")
-        
+        except:
+            return None
+
+    st.session_state.df = load_local_excel()
+
+    if st.session_state.df is not None:
+        st.success(f"✅ 本地小样本已加载！共 {len(st.session_state.df)} 条记录")
         with st.expander("🔍 查看可用公司代码"):
             unique_codes = sorted(st.session_state.df['code'].unique())
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
-        st.info("👆 请上传Excel数据文件开始使用")
-    
+        st.warning(f"ℹ️ 未找到 {excel_path}，仅可使用PDF打分")
+
     st.divider()
     st.subheader("🧭 功能导航")
     page = st.radio(
@@ -507,8 +505,8 @@ if page == "📝 PDF自动打分":
                     # 5. 更新回 session_state
                     st.session_state.df = df_final
 
-                    # ✅ 修复2：清除缓存！这是最关键的一步，防止查询页被旧数据覆盖
-                    load_uploaded_data.clear()
+                    # ✅ 清除本地缓存
+                    load_local_excel.clear()
 
                     # 6. 提示
                     st.success("✅ 合并成功！（已自动覆盖旧数据）")

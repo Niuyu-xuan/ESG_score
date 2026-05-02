@@ -477,7 +477,7 @@ if page == "📝 PDF自动打分":
         col1, col2 = st.columns(2)
         
         # ======================
-        # ✅ 合并数据功能
+        # ✅ 只改了这里：合并后强制刷新
         # ======================
         with col1:
             if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
@@ -510,6 +510,9 @@ if page == "📝 PDF自动打分":
                         st.write(f"• 未发现重复，直接新增")
                     st.write(f"• 合并后：{len(df_final)} 条")
                     st.info(f"现在去【企业详情查询】输入 {new_code} 查看最新数据")
+                    
+                    # ✅ 关键：强制刷新页面，新数据立刻显示
+                    st.rerun()
         
         with col2:
             def convert_single_row(row):

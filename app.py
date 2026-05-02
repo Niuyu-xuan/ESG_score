@@ -81,7 +81,7 @@ st.markdown("""
         background-color: #F0FDF4;
         border-radius: 10px;
         padding: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1 rgba(0, 0, 0, 0.1);
         border-left: 4px solid #10B981;
     }
     
@@ -300,14 +300,19 @@ with st.sidebar:
     @st.cache_data
     def load_finance_data():
         try:
-            # ✅ 加载A股全市场财务数据
+            # ✅ 已改为 CSV 稳定读取，彻底解决 Excel 报错
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            finance_path = os.path.join(current_dir, "Finance.xlsx")  # 👈 你的财务数据文件名
+            finance_path = os.path.join(current_dir, "finance.csv")  # 👈 改成 CSV
             
-            finance_df = pd.read_excel(finance_path, engine='openpyxl')
-            # 统一数据类型，确保匹配
+            finance_df = pd.read_csv(finance_path)  # 👈 用 read_csv
             finance_df['code'] = finance_df['code'].astype(str).str.strip()
             finance_df['year'] = finance_df['year'].astype(int)
+
+            # 财务字段转数字
+            for c in ["F050201B", "F050501B", "F051501B", "F053301B", "F051201B"]:
+                if c in finance_df.columns:
+                    finance_df[c] = pd.to_numeric(finance_df[c], errors="coerce")
+
             return finance_df
         except Exception as e:
             st.warning(f"财务数据加载失败：{str(e)}，将使用手动输入模式")
@@ -329,7 +334,7 @@ with st.sidebar:
     if st.session_state.finance_df is not None:
         st.success(f"✅ 财务数据已加载：{len(st.session_state.finance_df)} 条记录")
     else:
-        st.info("ℹ️ 未找到A股.xlsx，将使用手动输入模式")
+        st.info("ℹ️ 未找到finance.csv，将使用手动输入模式")
 
     st.divider()
     st.subheader("🧭 功能导航")

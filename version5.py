@@ -752,20 +752,32 @@ class ESGCarbonScoringSystem:
                 })
                 return None
 
-        # ── 后处理：重新计算总分与评级 ────────────────────────────────────────
+        # ====================== 【终极修复：强制重算所有分数，解决求和错误】 ======================
         details = scoring_json.get("scoring_details", {})
-        calculated_score = sum(
-            float(d.get("subtotal", 0) or 0) for d in details.values()
-        )
-        calculated_score = round(calculated_score, 1)
+        total_all = 0.0
+        # 遍历所有维度，强制重算subtotal
+        for dim_key, dim_data in details.items():
+            dim_sum = 0.0
+            # 强制转换score为数字，逐项求和
+            for item in dim_data.get("items", []):
+                score = float(item.get("score", 0))
+                dim_sum += score
+            dim_sum = round(dim_sum, 1)
+            dim_data["subtotal"] = dim_sum
+            total_all += dim_sum
+
+        # 统一最终分数，100%对齐
+        calculated_score = round(total_all, 1)
         scoring_json["final_score"] = calculated_score
+        # 匹配评级
         for (lo, hi), label in self.score_level_map.items():
             if lo <= calculated_score <= hi:
                 scoring_json["score_level"] = label
                 break
         print(f"  [确认] 最终评分：{calculated_score}/20 [{scoring_json['score_level']}]")
+        # ========================================================================================
 
-        # ── 新增：强制修正summary中的综合评价（确保评级与得分100%一致）──────────
+        # ── 强制修正summary中的综合评价（确保评级与得分100%一致）──────────
         summary = scoring_json.setdefault("summary", {})
         original_eval = summary.get("comprehensive_evaluation", "").strip()
         correct_level = scoring_json["score_level"]
@@ -848,7 +860,6 @@ class ESGCarbonScoringSystem:
 
 
 def export_batch_results_to_excel(batch_results, output_path: str = "ESG碳信息评分汇总结果.xlsx"):
-    """将批次结果追加导出，不会覆盖历史数据"""
     if not batch_results:
         print("无批量结果可导出")
         return
@@ -1094,7 +1105,7 @@ if __name__ == "__main__":
                 "success":     len(batch_results),
                 "failed":      len(scorer.batch_fail_log),
                 "start_index": START_INDEX,
-                "max_count":   MAX_COUNT
+                "max_count": MAX_COUNT
             },
             "scoring_results": [
                 {

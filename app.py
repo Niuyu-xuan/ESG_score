@@ -282,7 +282,7 @@ with st.sidebar:
         @st.cache_data
         def load_uploaded_data(file):
             df = pd.read_excel(file)
-            # ✅ 关键修复1：强制把code列转成字符串，并且去掉前后空格
+            # ✅ 安全修复：强制把code列转成字符串，并且去掉前后空格
             df['code'] = df['code'].astype(str).str.strip()
             df['year'] = df['year'].astype(int)
             
@@ -413,7 +413,7 @@ if page == "📝 PDF自动打分":
                         extra_finance_data=finance_data
                     )
                     
-                    # ✅ 关键修复2：新打分的code也转成字符串并去空格
+                    # ✅ 安全修复：新打分的code也转成字符串并去空格
                     result_row['code'] = str(stock_code).strip()
                     st.session_state.latest_score = result_row
                     st.success("✅ 打分完成！")
@@ -475,43 +475,50 @@ if page == "📝 PDF自动打分":
         col1, col2 = st.columns(2)
         
         # ======================
-        # ✅ 修复后的保存按钮：自动去重 + 统一数据类型 + 自动刷新
+        # ✅ 最安全的合并逻辑：只删同公司同年的那1条
         # ======================
         with col1:
-            if st.button("💾 自动去重 → 合并到我的小样本", use_container_width=True):
+            if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
                 if st.session_state.df is None:
                     st.warning("请先在左侧上传你的小样本Excel")
                 else:
-                    # 1. 提取新行的关键信息（已经是字符串了）
-                    code = result['code']
-                    year = result['year']
-                    df = st.session_state.df
-
-                    # 2. 自动去重：同 code + year 删掉旧的
-                    mask = (df['code'] == code) & (df['year'] == year)
-                    old_num = mask.sum()
-                    df_new = df[~mask].copy()
-
-                    # 3. 追加新行
+                    # 1. 提取关键信息
+                    new_code = result['code']
+                    new_year = result['year']
+                    df = st.session_state.df.copy() # 先复制一份，防止误操作
+                    
+                    original_count = len(df)
+                    
+                    # 2. 【核心安全逻辑】：只找 code 完全一样 AND year 完全一样的行
+                    # 只有这两个条件同时满足，才认为是同一条数据，才覆盖
+                    mask = (df['code'] == new_code) & (df['year'] == new_year)
+                    duplicate_count = mask.sum()
+                    
+                    # 3. 删掉重复的行（如果有）
+                    if duplicate_count > 0:
+                        df = df[~mask].copy()
+                    
+                    # 4. 追加新行
                     new_row = pd.DataFrame([result])
-                    df_final = pd.concat([df_new, new_row], ignore_index=True)
-
-                    # 4. 更新回 session_state
+                    df_final = pd.concat([df, new_row], ignore_index=True)
+                    
+                    final_count = len(df_final)
+                    
+                    # 5. 更新回 session_state
                     st.session_state.df = df_final
                     
-                    # 5. 友好提示
-                    if old_num > 0:
-                        st.success(f"✅ 已自动覆盖重复数据 | 原{old_num}条 → 已更新")
+                    # 6. 非常清晰的提示，让你知道发生了什么
+                    st.success("✅ 合并成功！")
+                    st.write(f"• 合并前数据量：{original_count} 条")
+                    if duplicate_count > 0:
+                        st.write(f"• 发现并覆盖了 {duplicate_count} 条旧数据（同公司代码 {new_code} 且同年 {new_year}）")
                     else:
-                        st.success("✅ 已新增并合并到小样本")
-                    st.info(f"已合并：公司代码 {code}，年份 {year}")
-                    st.info(f"当前总数据：{len(st.session_state.df)} 条")
-                    
-                    # ✅ 关键修复3：合并后自动刷新页面，立刻就能看到新数据
-                    st.rerun()
+                        st.write(f"• 未发现重复数据，直接新增")
+                    st.write(f"• 合并后数据量：{final_count} 条")
+                    st.info(f"现在可以去【企业详情查询】输入 {new_code} 查看")
         
         with col2:
-            # 提供单条结果下载（彻底修复所有错误）
+            # 提供单条结果下载
             def convert_single_row(row):
                 output = BytesIO()
                 pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
@@ -539,7 +546,7 @@ elif page == "📄 企业详情查询":
         ).strip()
     
     if input_code:
-        # ✅ 关键修复4：查询时也把输入转成字符串并去空格
+        # ✅ 安全修复：查询时也把输入转成字符串并去空格
         input_code = str(input_code).strip()
         company_data = st.session_state.df[st.session_state.df['code'] == input_code].sort_values('year')
         
@@ -887,7 +894,7 @@ elif page == "📊 四象限对标分析":
         if not input_code:
             st.error("请输入公司代码")
         else:
-            # ✅ 关键修复5：四象限查询也转成字符串
+            # ✅ 安全修复：四象限查询也转成字符串
             input_code = str(input_code).strip()
             target_df = st.session_state.df[(st.session_state.df['code'] == input_code) & (st.session_state.df['year'] == input_year)]
             

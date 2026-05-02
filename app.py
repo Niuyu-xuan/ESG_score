@@ -302,7 +302,7 @@ with st.sidebar:
         try:
             # ✅ 加载A股全市场财务数据
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            finance_path = os.path.join(current_dir, "A股财务指标.xlsx")  # 👈 你的财务数据文件名
+            finance_path = os.path.join(current_dir, "A股.xlsx")  # 👈 你的财务数据文件名
             
             finance_df = pd.read_excel(finance_path)
             # 统一数据类型，确保匹配
@@ -329,7 +329,7 @@ with st.sidebar:
     if st.session_state.finance_df is not None:
         st.success(f"✅ 财务数据已加载：{len(st.session_state.finance_df)} 条记录")
     else:
-        st.info("ℹ️ 未找到A股财务指标.xlsx，将使用手动输入模式")
+        st.info("ℹ️ 未找到A股.xlsx，将使用手动输入模式")
 
     st.divider()
     st.subheader("🧭 功能导航")

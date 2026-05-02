@@ -448,7 +448,7 @@ class ESGCarbonScoringSystem:
     # ─────────────────────────────────────────────────────────────────────────
     # 辅助：从 scoring_details 中统计各分数段项目
     # ─────────────────────────────────────────────────────────────────────────
-    def _collect_item_scores(self, scoring_json: dict) -> dict:
+    def _collect_item_scores(self, scoring_result: dict) -> dict:
         """
         返回 {
             "full_score_items":  [...],   # score == max_score == 2
@@ -457,7 +457,7 @@ class ESGCarbonScoringSystem:
             "total_items":       int,
         }
         """
-        details = scoring_json.get("scoring_details", {})
+        details = scoring_result.get("scoring_details", {})
         full_score_items = []
         zero_score_items = []
         one_score_items  = []
@@ -484,16 +484,19 @@ class ESGCarbonScoringSystem:
         }
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 核心校验逻辑（含"无"规则）
+    # 核心校验逻辑（修复层级错误+逐项求和+少1分bug）
     # ─────────────────────────────────────────────────────────────────────────
     def _validate_scoring_result(self, scoring_json: dict) -> Tuple[bool, str]:
         """
         返回 (is_valid: bool, fail_reason: str)
         fail_reason 为空字符串表示通过
         """
+        # 修复：读取正确的JSON层级
+        scoring_result = scoring_json.get("scoring_result", {})
+        details = scoring_result.get("scoring_details", {})
+
         # ── 必要字段 ──────────────────────────────────────────────────────────
-        required_fields = ["company_name", "report_year", "scoring_details",
-                           "final_score", "score_level", "summary"]
+        required_fields = ["company_name", "report_year", "final_score", "score_level", "summary"]
         for field in required_fields:
             if field not in scoring_json:
                 return False, f"缺少必要字段: {field}"
@@ -516,7 +519,7 @@ class ESGCarbonScoringSystem:
             return False, "综合评价字数不足150字"
 
         # ── 统计各分数段项目 ──────────────────────────────────────────────────
-        score_info = self._collect_item_scores(scoring_json)
+        score_info = self._collect_item_scores(scoring_result)
         has_full   = len(score_info["full_score_items"]) > 0
         all_full   = (score_info["total_items"] > 0 and
                       len(score_info["full_score_items"]) == score_info["total_items"])
@@ -574,13 +577,16 @@ class ESGCarbonScoringSystem:
                 if len(sug) < 40:
                     return False, f"improvement_suggestions 中有条目不足40字：{sug[:20]}..."
 
-        # ── 总分一致性校验 ────────────────────────────────────────────────────
-        details = scoring_json.get("scoring_details", {})
-        calculated_score = sum(float(d.get("subtotal", 0)) for d in details.values())
+        # ── 修复：强制遍历所有小项score求和，彻底解决少1分问题 ──────────
+        calculated_score = 0.0
+        for dim_data in details.values():
+            for item in dim_data.get("items", []):
+                calculated_score += float(item.get("score", 0))
         calculated_score = round(calculated_score, 1)
         original_score   = float(scoring_json.get("final_score", 0))
-        if abs(calculated_score - original_score) > 0.5:
-            return False, f"总分不一致：计算值{calculated_score} vs LLM值{original_score}"
+
+        if abs(calculated_score - original_score) > 0.1:
+            return False, f"总分不一致：真实求和{calculated_score} vs 输出{original_score}"
 
         return True, ""
 

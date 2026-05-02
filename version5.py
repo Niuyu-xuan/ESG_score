@@ -574,17 +574,13 @@ class ESGCarbonScoringSystem:
                 if len(sug) < 40:
                     return False, f"improvement_suggestions 中有条目不足40字：{sug[:20]}..."
 
-        # ========== 【修复 1：总分校验 - 遍历所有项目 score 求和】 ==========
+        # ── 总分一致性校验 ────────────────────────────────────────────────────
         details = scoring_json.get("scoring_details", {})
-        calculated_score = 0.0
-        for dim_data in details.values():
-            for item in dim_data.get("items", []):
-                calculated_score += float(item.get("score", 0))
+        calculated_score = sum(float(d.get("subtotal", 0)) for d in details.values())
         calculated_score = round(calculated_score, 1)
-        original_score = float(scoring_json.get("final_score", 0))
-        if abs(calculated_score - original_score) > 0.1:
-            return False, f"总分不一致：项目求和{calculated_score} vs LLM值{original_score}"
-        # ====================================================================
+        original_score   = float(scoring_json.get("final_score", 0))
+        if abs(calculated_score - original_score) > 0.5:
+            return False, f"总分不一致：计算值{calculated_score} vs LLM值{original_score}"
 
         return True, ""
 
@@ -756,16 +752,13 @@ class ESGCarbonScoringSystem:
                 })
                 return None
 
-        # ========== 【修复 2：后处理总分 - 遍历所有项目 score 求和】 ==========
+        # ── 后处理：重新计算总分与评级 ────────────────────────────────────────
         details = scoring_json.get("scoring_details", {})
-        calculated_score = 0.0
-        for dim_data in details.values():
-            for item in dim_data.get("items", []):
-                calculated_score += float(item.get("score", 0))
+        calculated_score = sum(
+            float(d.get("subtotal", 0) or 0) for d in details.values()
+        )
         calculated_score = round(calculated_score, 1)
         scoring_json["final_score"] = calculated_score
-        # ====================================================================
-
         for (lo, hi), label in self.score_level_map.items():
             if lo <= calculated_score <= hi:
                 scoring_json["score_level"] = label

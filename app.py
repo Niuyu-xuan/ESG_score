@@ -266,14 +266,13 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     
     return final_row
 
-# ================= 4. 侧边栏：自动读取本地小样本.xlsx =================
+# ================= 4. 侧边栏：自动读取本地小样本.xlsx（Streamlit兼容版） =================
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/leaf.png", width=80)
     st.title("🌿 ESG碳披露分析")
     st.divider()
     
     st.subheader("📁 数据已自动加载")
-    excel_path = "小样本.xlsx"
 
     if 'df' not in st.session_state:
         st.session_state.df = None
@@ -281,6 +280,10 @@ with st.sidebar:
     @st.cache_data
     def load_local_excel():
         try:
+            # ✅ 关键：获取当前代码文件所在的绝对路径，保证Streamlit能找到文件
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            excel_path = os.path.join(current_dir, "小样本.xlsx")
+            
             df = pd.read_excel(excel_path)
             df['code'] = df['code'].astype(str).str.strip()
             df['year'] = df['year'].astype(int)
@@ -288,7 +291,8 @@ with st.sidebar:
                 if col in df.columns:
                     df[col] = df[col].astype(str).str.replace(';', '；')
             return df
-        except:
+        except Exception as e:
+            st.error(f"文件加载失败：{str(e)}")
             return None
 
     st.session_state.df = load_local_excel()
@@ -300,7 +304,7 @@ with st.sidebar:
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
-        st.warning(f"ℹ️ 未找到 {excel_path}，仅可使用PDF打分")
+        st.warning(f"ℹ️ 未找到小样本.xlsx，仅可使用PDF打分功能")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -310,7 +314,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-# 未上传文件时显示欢迎界面
+# 未加载文件时的提示
 if st.session_state.df is None and page != "📝 PDF自动打分":
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -324,7 +328,7 @@ if st.session_state.df is None and page != "📝 PDF自动打分":
         st.write("✅ 单年详细评分与雷达图展示")
         st.write("✅ 行业经济绩效与碳披露四象限对标")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("👈 请先在左侧边栏上传你的Excel数据文件")
+        st.info("ℹ️ 小样本.xlsx未加载，仅可使用PDF打分功能")
         st.stop()
 
 # ================= 5. 页面实现 =================
@@ -473,42 +477,31 @@ if page == "📝 PDF自动打分":
         col1, col2 = st.columns(2)
         
         # ======================
-        # ✅ 【在你原来代码基础上的终极修复】
+        # ✅ 合并数据功能
         # ======================
         with col1:
             if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
                 if st.session_state.df is None:
-                    st.warning("请先在左侧上传你的小样本Excel")
+                    st.warning("小样本未加载，无法合并")
                 else:
-                    # 1. 提取关键信息
                     new_code = result['code']
                     new_year = result['year']
                     df = st.session_state.df.copy()
-
-                    # ✅ 修复1：强制清理旧数据的code，确保能匹配
                     df['code'] = df['code'].astype(str).str.strip()
 
                     original_count = len(df)
-
-                    # 2. 匹配：同 code + 同年份
                     mask = (df['code'] == new_code) & (df['year'] == new_year)
                     duplicate_count = mask.sum()
 
-                    # 3. 删掉旧的
                     if duplicate_count > 0:
                         df = df[~mask].copy()
 
-                    # 4. 追加新的
                     new_row = pd.DataFrame([result])
                     df_final = pd.concat([df, new_row], ignore_index=True)
 
-                    # 5. 更新回 session_state
                     st.session_state.df = df_final
-
-                    # ✅ 清除本地缓存
                     load_local_excel.clear()
 
-                    # 6. 提示
                     st.success("✅ 合并成功！（已自动覆盖旧数据）")
                     st.write(f"• 合并前：{original_count} 条")
                     if duplicate_count > 0:
@@ -519,7 +512,6 @@ if page == "📝 PDF自动打分":
                     st.info(f"现在去【企业详情查询】输入 {new_code} 查看最新数据")
         
         with col2:
-            # 提供单条结果下载
             def convert_single_row(row):
                 output = BytesIO()
                 pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
@@ -547,7 +539,6 @@ elif page == "📄 企业详情查询":
         ).strip()
     
     if input_code:
-        # ✅ 安全修复：查询时也把输入转成字符串并去空格
         input_code = str(input_code).strip()
         company_data = st.session_state.df[st.session_state.df['code'] == input_code].sort_values('year')
         
@@ -569,11 +560,7 @@ elif page == "📄 企业详情查询":
             </div>
             """, unsafe_allow_html=True)
             
-            # --------------------------
-            # 模块1: 历年各维度得分总览
-            # --------------------------
             st.subheader("📋 历年各维度得分总览")
-
             full_data = []
             for _, row in company_data.iterrows():
                 year_row = {
@@ -634,11 +621,7 @@ elif page == "📄 企业详情查询":
                 height=300
             )
             
-            # --------------------------
-            # 模块2: 多维度趋势折线图
-            # --------------------------
             st.subheader("📈 多维度得分趋势对比")
-            
             all_dimensions = ['最终得分'] + PROJECT_LIST
             selected_dimensions = st.multiselect(
                 "选择要对比的维度（可多选）",
@@ -703,9 +686,6 @@ elif page == "📄 企业详情查询":
                 
                 st.plotly_chart(fig_multi, use_container_width=True)
             
-            # --------------------------
-            # 模块3: 单年详情选择
-            # --------------------------
             st.divider()
             st.subheader("🔍 单年详细信息")
             
@@ -752,9 +732,6 @@ elif page == "📄 企业详情查询":
                 </div>
                 """, unsafe_allow_html=True)
             
-            # --------------------------
-            # 雷达图
-            # --------------------------
             st.subheader(f"🎯 {selected_year_value}年 各维度得分雷达图")
             col1, col2 = st.columns([1, 1])
             
@@ -895,7 +872,6 @@ elif page == "📊 四象限对标分析":
         if not input_code:
             st.error("请输入公司代码")
         else:
-            # ✅ 安全修复：四象限查询也转成字符串
             input_code = str(input_code).strip()
             target_df = st.session_state.df[(st.session_state.df['code'] == input_code) & (st.session_state.df['year'] == input_year)]
             

@@ -286,7 +286,7 @@ with st.sidebar:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             excel_path = os.path.join(current_dir, "小样本.xlsx")
             
-            df = pd.read_excel(excel_path)
+            df = pd.read_excel(excel_path, engine='openpyxl')
             df['code'] = df['code'].astype(str).str.strip()
             df['year'] = df['year'].astype(int)
             for col in ['核心优势', '核心问题', '改进建议']:
@@ -304,7 +304,7 @@ with st.sidebar:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             finance_path = os.path.join(current_dir, "Finance.xlsx")  # 👈 你的财务数据文件名
             
-            finance_df = pd.read_excel(finance_path)
+            finance_df = pd.read_excel(finance_path, engine='openpyxl')
             # 统一数据类型，确保匹配
             finance_df['code'] = finance_df['code'].astype(str).str.strip()
             finance_df['year'] = finance_df['year'].astype(int)

@@ -31,6 +31,7 @@ def check_password():
     else:
         return True
 
+# 执行密码检查
 if not check_password():
     st.stop()
 
@@ -81,7 +82,7 @@ st.markdown("""
         background-color: #F0FDF4;
         border-radius: 10px;
         padding: 1.5rem;
-        box-shadow: 0 4px 6px -1 rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         border-left: 4px solid #10B981;
     }
     
@@ -265,7 +266,7 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     
     return final_row
 
-# ================= 4. 全局数据加载（小样本 + A股财务数据） =================
+# ================= 4. 侧边栏：自动读取本地小样本.xlsx（Streamlit兼容版） =================
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/leaf.png", width=80)
     st.title("🌿 ESG碳披露分析")
@@ -275,9 +276,6 @@ with st.sidebar:
 
     if 'df' not in st.session_state:
         st.session_state.df = None
-    
-    if 'finance_df' not in st.session_state:
-        st.session_state.finance_df = None
 
     @st.cache_data
     def load_local_excel():
@@ -286,7 +284,7 @@ with st.sidebar:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             excel_path = os.path.join(current_dir, "小样本.xlsx")
             
-            df = pd.read_excel(excel_path, engine='openpyxl')
+            df = pd.read_excel(excel_path)
             df['code'] = df['code'].astype(str).str.strip()
             df['year'] = df['year'].astype(int)
             for col in ['核心优势', '核心问题', '改进建议']:
@@ -294,47 +292,19 @@ with st.sidebar:
                     df[col] = df[col].astype(str).str.replace(';', '；')
             return df
         except Exception as e:
-            st.error(f"小样本加载失败：{str(e)}")
+            st.error(f"文件加载失败：{str(e)}")
             return None
 
-    @st.cache_data
-    def load_finance_data():
-        try:
-            # ✅ 已改为 CSV 稳定读取，彻底解决 Excel 报错
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            finance_path = os.path.join(current_dir, "finance.csv")  # 👈 改成 CSV
-            
-            finance_df = pd.read_csv(finance_path)  # 👈 用 read_csv
-            finance_df['code'] = finance_df['code'].astype(str).str.strip()
-            finance_df['year'] = finance_df['year'].astype(int)
-
-            # 财务字段转数字
-            for c in ["F050201B", "F050501B", "F051501B", "F053301B", "F051201B"]:
-                if c in finance_df.columns:
-                    finance_df[c] = pd.to_numeric(finance_df[c], errors="coerce")
-
-            return finance_df
-        except Exception as e:
-            st.warning(f"财务数据加载失败：{str(e)}，将使用手动输入模式")
-            return None
-
-    # 加载数据
     st.session_state.df = load_local_excel()
-    st.session_state.finance_df = load_finance_data()
 
     if st.session_state.df is not None:
-        st.success(f"✅ 小样本已加载：{len(st.session_state.df)} 条记录")
+        st.success(f"✅ 本地小样本已加载！共 {len(st.session_state.df)} 条记录")
         with st.expander("🔍 查看可用公司代码"):
             unique_codes = sorted(st.session_state.df['code'].unique())
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
         st.warning(f"ℹ️ 未找到小样本.xlsx，仅可使用PDF打分功能")
-    
-    if st.session_state.finance_df is not None:
-        st.success(f"✅ 财务数据已加载：{len(st.session_state.finance_df)} 条记录")
-    else:
-        st.info("ℹ️ 未找到finance.csv，将使用手动输入模式")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -363,7 +333,7 @@ if st.session_state.df is None and page != "📝 PDF自动打分":
 
 # ================= 5. 页面实现 =================
 
-# --- 页面 3: PDF自动打分（新增自动获取财务数据功能） ---
+# --- 页面 3: PDF自动打分 ---
 if page == "📝 PDF自动打分":
     st.title("ESG报告PDF自动打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成分析报告")
@@ -396,88 +366,23 @@ if page == "📝 PDF自动打分":
     with col4:
         industry_code = st.text_input("行业代码 (industrycodec)", placeholder="例如：B07")
     
-    # ✅ 新增：自动获取财务数据按钮
-    if st.session_state.finance_df is not None:
-        if st.button("🔍 自动获取财务数据", use_container_width=True):
-            if not stock_code or not report_year:
-                st.error("请先填写股票代码和报告年份")
-            else:
-                # 查找匹配的财务数据
-                finance_df = st.session_state.finance_df
-                match = finance_df[
-                    (finance_df['code'] == str(stock_code).strip()) & 
-                    (finance_df['year'] == int(report_year))
-                ]
-                
-                if match.empty:
-                    st.warning(f"未找到代码 {stock_code} 在 {report_year} 年的财务数据，请手动输入")
-                else:
-                    # 提取匹配的第一条记录
-                    finance_data = match.iloc[0]
-                    st.success(f"✅ 成功获取 {stock_code} {report_year} 年财务数据！")
-                    
-                    # 自动填充到session_state，刷新页面后显示
-                    st.session_state.auto_finance = {
-                        'F050201B': finance_data.get('F050201B', 0.0),
-                        'F050501B': finance_data.get('F050501B', 0.0),
-                        'F051501B': finance_data.get('F051501B', 0.0),
-                        'F053301B': finance_data.get('F053301B', 0.0),
-                        'F051201B': finance_data.get('F051201B', 0.0)
-                    }
-                    st.rerun()
-    
     st.divider()
     
-    # 4. 财务指标输入（支持自动填充）
-    st.subheader("💰 3. 财务指标")
-    st.info("已加载A股全市场财务数据，输入代码和年份后点击「自动获取财务数据」即可自动填充")
-    
-    # 初始化自动填充的财务数据
-    if 'auto_finance' not in st.session_state:
-        st.session_state.auto_finance = {
-            'F050201B': 0.0,
-            'F050501B': 0.0,
-            'F051501B': 0.0,
-            'F053301B': 0.0,
-            'F051201B': 0.0
-        }
+    # 4. 财务指标输入
+    st.subheader("💰 3. 补充财务指标（选填）")
+    st.info("如果不填写，打分后无法进行四象限分析，但不影响详情查询功能")
     
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        f050201b = st.number_input(
-            "总资产净利润率 (ROA)", 
-            format="%.4f", 
-            value=st.session_state.auto_finance['F050201B'],
-            help="F050201B"
-        )
+        f050201b = st.number_input("总资产净利润率 (ROA)", format="%.4f", help="F050201B")
     with col2:
-        f050501b = st.number_input(
-            "净资产收益率 (ROE)", 
-            format="%.4f", 
-            value=st.session_state.auto_finance['F050501B'],
-            help="F050501B"
-        )
+        f050501b = st.number_input("净资产收益率 (ROE)", format="%.4f", help="F050501B")
     with col3:
-        f051501b = st.number_input(
-            "营业净利率", 
-            format="%.4f", 
-            value=st.session_state.auto_finance['F051501B'],
-            help="F051501B"
-        )
+        f051501b = st.number_input("营业净利率", format="%.4f", help="F051501B")
     with col4:
-        f053301b = st.number_input(
-            "营业毛利率", 
-            format="%.4f", 
-            value=st.session_state.auto_finance['F053301B'],
-            help="F053301B"
-        )
+        f053301b = st.number_input("营业毛利率", format="%.4f", help="F053301B")
     with col5:
-        f051201b = st.number_input(
-            "投入资本回报率 (ROIC)", 
-            format="%.4f", 
-            value=st.session_state.auto_finance['F051201B'],
-            help="F051201B"
-        )
+        f051201b = st.number_input("投入资本回报率 (ROIC)", format="%.4f", help="F051201B")
     
     finance_data = {
         'F050201B': f050201b,
@@ -513,14 +418,6 @@ if page == "📝 PDF自动打分":
                     # ✅ 安全修复：新打分的code也转成字符串并去空格
                     result_row['code'] = str(stock_code).strip()
                     st.session_state.latest_score = result_row
-                    # 清空自动填充的财务数据，准备下一次使用
-                    st.session_state.auto_finance = {
-                        'F050201B': 0.0,
-                        'F050501B': 0.0,
-                        'F051501B': 0.0,
-                        'F053301B': 0.0,
-                        'F051201B': 0.0
-                    }
                     st.success("✅ 打分完成！")
             
             except Exception as e:
@@ -613,9 +510,6 @@ if page == "📝 PDF自动打分":
                         st.write(f"• 未发现重复，直接新增")
                     st.write(f"• 合并后：{len(df_final)} 条")
                     st.info(f"现在去【企业详情查询】输入 {new_code} 查看最新数据")
-                    
-                    # ✅ 关键：强制刷新页面，新数据立刻显示
-                    st.rerun()
         
         with col2:
             def convert_single_row(row):

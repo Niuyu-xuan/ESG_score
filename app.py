@@ -302,7 +302,7 @@ with st.sidebar:
         try:
             # ✅ 加载A股全市场财务数据
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            finance_path = os.path.join(current_dir, "A股.xlsx")  # 👈 你的财务数据文件名
+            finance_path = os.path.join(current_dir, "Finance.xlsx")  # 👈 你的财务数据文件名
             
             finance_df = pd.read_excel(finance_path)
             # 统一数据类型，确保匹配

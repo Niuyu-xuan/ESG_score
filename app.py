@@ -475,7 +475,7 @@ if page == "📝 PDF自动打分":
         col1, col2 = st.columns(2)
         
         # ======================
-        # ✅ 最安全的合并逻辑：只删同公司同年的那1条
+        # ✅ 【在你原来代码基础上的终极修复】
         # ======================
         with col1:
             if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
@@ -485,37 +485,40 @@ if page == "📝 PDF自动打分":
                     # 1. 提取关键信息
                     new_code = result['code']
                     new_year = result['year']
-                    df = st.session_state.df.copy() # 先复制一份，防止误操作
-                    
+                    df = st.session_state.df.copy()
+
+                    # ✅ 修复1：强制清理旧数据的code，确保能匹配
+                    df['code'] = df['code'].astype(str).str.strip()
+
                     original_count = len(df)
-                    
-                    # 2. 【核心安全逻辑】：只找 code 完全一样 AND year 完全一样的行
-                    # 只有这两个条件同时满足，才认为是同一条数据，才覆盖
+
+                    # 2. 匹配：同 code + 同年份
                     mask = (df['code'] == new_code) & (df['year'] == new_year)
                     duplicate_count = mask.sum()
-                    
-                    # 3. 删掉重复的行（如果有）
+
+                    # 3. 删掉旧的
                     if duplicate_count > 0:
                         df = df[~mask].copy()
-                    
-                    # 4. 追加新行
+
+                    # 4. 追加新的
                     new_row = pd.DataFrame([result])
                     df_final = pd.concat([df, new_row], ignore_index=True)
-                    
-                    final_count = len(df_final)
-                    
+
                     # 5. 更新回 session_state
                     st.session_state.df = df_final
-                    
-                    # 6. 非常清晰的提示，让你知道发生了什么
-                    st.success("✅ 合并成功！")
-                    st.write(f"• 合并前数据量：{original_count} 条")
+
+                    # ✅ 修复2：清除缓存！这是最关键的一步，防止查询页被旧数据覆盖
+                    load_uploaded_data.clear()
+
+                    # 6. 提示
+                    st.success("✅ 合并成功！（已自动覆盖旧数据）")
+                    st.write(f"• 合并前：{original_count} 条")
                     if duplicate_count > 0:
-                        st.write(f"• 发现并覆盖了 {duplicate_count} 条旧数据（同公司代码 {new_code} 且同年 {new_year}）")
+                        st.write(f"• 覆盖了 {duplicate_count} 条旧数据（同公司 {new_code} 且同年 {new_year}）")
                     else:
-                        st.write(f"• 未发现重复数据，直接新增")
-                    st.write(f"• 合并后数据量：{final_count} 条")
-                    st.info(f"现在可以去【企业详情查询】输入 {new_code} 查看")
+                        st.write(f"• 未发现重复，直接新增")
+                    st.write(f"• 合并后：{len(df_final)} 条")
+                    st.info(f"现在去【企业详情查询】输入 {new_code} 查看最新数据")
         
         with col2:
             # 提供单条结果下载

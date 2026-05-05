@@ -12,82 +12,125 @@ import time
 import requests
 import matplotlib
 
-# ================= 0. 全新设计的密码验证与欢迎页 =================
+# ================= 0. 全新升级的登录界面 =================
 def check_password():
     """返回用户是否输入了正确的密码"""
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
     
     if not st.session_state.password_correct:
-        # 全新设计的登录页
         st.set_page_config(page_title="ESG碳披露分析平台", page_icon="🌿", layout="centered")
         
-        # 自定义CSS
+        # 全新高级CSS
         st.markdown("""
         <style>
+            /* 全局背景：渐变+模糊效果 */
             .main {
-                background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+                background: linear-gradient(135deg, #065F46 0%, #10B981 50%, #34D399 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
-            .login-container {
-                max-width: 500px;
-                margin: 0 auto;
-                padding: 3rem 2rem;
-                background: white;
-                border-radius: 20px;
-                box-shadow: 0 20px 60px rgba(16, 185, 129, 0.15);
+            
+            /* 登录卡片：玻璃拟态效果 */
+            .login-card {
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(20px);
+                border-radius: 24px;
+                padding: 3rem 2.5rem;
+                box-shadow: 0 25px 80px rgba(0, 0, 0, 0.2);
+                max-width: 480px;
+                width: 100%;
+                border: 1px solid rgba(255, 255, 255, 0.3);
             }
+            
+            /* 标题样式 */
             .login-title {
                 text-align: center;
                 color: #065F46;
                 font-weight: 800;
+                font-size: 2.2rem;
                 margin-bottom: 0.5rem;
             }
+            
             .login-subtitle {
                 text-align: center;
                 color: #64748B;
-                margin-bottom: 2rem;
+                font-size: 1.1rem;
+                margin-bottom: 2.5rem;
+                line-height: 1.6;
             }
-            .stButton > button {
-                background-color: #10B981;
-                color: white;
-                border-radius: 12px;
-                padding: 0.75rem 2rem;
-                font-weight: 600;
-                border: none;
-                width: 100%;
-                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-            }
-            .stButton > button:hover {
-                background-color: #059669;
-                box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
-            }
+            
+            /* 输入框美化 */
             .stTextInput > div > div > input {
-                border-radius: 10px;
-                border: 2px solid #D1FAE5;
-                padding: 0.75rem 1rem;
+                border-radius: 14px;
+                border: 2px solid #E5E7EB;
+                padding: 1rem 1.25rem;
+                font-size: 1rem;
+                transition: all 0.3s ease;
+                background-color: #F9FAFB;
             }
+            
             .stTextInput > div > div > input:focus {
                 border-color: #10B981;
-                box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+                box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+                background-color: white;
             }
+            
+            /* 按钮美化 */
+            .stButton > button {
+                background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+                color: white;
+                border-radius: 14px;
+                padding: 1rem 2rem;
+                font-weight: 700;
+                font-size: 1.1rem;
+                border: none;
+                width: 100%;
+                box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+                transition: all 0.3s ease;
+                margin-top: 1rem;
+            }
+            
+            .stButton > button:hover {
+                background: linear-gradient(135deg, #059669 0%, #047857 100%);
+                box-shadow: 0 12px 28px rgba(16, 185, 129, 0.4);
+                transform: translateY(-2px);
+            }
+            
+            .stButton > button:active {
+                transform: translateY(0);
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            }
+            
+            /* 隐藏默认的Streamlit元素 */
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
         </style>
         """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 3, 1])
+        col1, col2, col3 = st.columns([1, 6, 1])
         with col2:
             st.markdown("""
-            <div class="login-container">
-                <div style="text-align: center; margin-bottom: 1.5rem;">
-                    <span style="font-size: 4rem;">🌿</span>
+            <div class="login-card">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <span style="font-size: 5rem;">🌿</span>
                 </div>
                 <h1 class="login-title">ESG碳披露分析平台</h1>
-                <p class="login-subtitle">企业碳信息披露智能分析与可视化系统</p>
+                <p class="login-subtitle">企业碳信息披露智能分析与可视化系统<br>专业 · 高效 · 精准</p>
             </div>
             """, unsafe_allow_html=True)
             
-            password = st.text_input("请输入访问密码", type="password", placeholder="请输入密码以访问系统")
+            password = st.text_input(
+                "请输入访问密码", 
+                type="password", 
+                placeholder="请输入密码以访问系统",
+                label_visibility="collapsed"
+            )
             
-            if password:
+            if st.button("登录系统", use_container_width=True):
                 if password == "ESG123":
                     st.session_state.password_correct = True
                     st.rerun()
@@ -174,11 +217,13 @@ st.markdown("""
         font-weight: 600;
         border: none;
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        transition: all 0.2s ease;
     }
     
     .stButton > button:hover {
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
         box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+        transform: translateY(-1px);
     }
     
     /* 侧边栏样式 */
@@ -211,10 +256,23 @@ st.markdown("""
     .stSelectbox > div > div {
         border-radius: 10px;
         border: 2px solid #D1FAE5;
+        transition: all 0.2s ease;
     }
     
     .stSelectbox > div > div:hover {
         border-color: #10B981;
+    }
+    
+    /* 输入框美化 */
+    .stTextInput > div > div > input {
+        border-radius: 10px;
+        border: 2px solid #D1FAE5;
+        transition: all 0.2s ease;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #10B981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -417,7 +475,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
 
 # ================= 5. 页面实现 =================
 
-# --- 页面 1: 全景统计概览 (原年度统计，调整为第一页) ---
+# --- 页面 1: 全景统计概览 ---
 if page == "📈 全景统计概览":
     st.title("全景统计概览")
     st.markdown("展示2020-2025年碳披露分数的宏观趋势、描述性统计，以及每年表现最佳和最差的企业")
@@ -482,7 +540,7 @@ if page == "📈 全景统计概览":
             )
             st.plotly_chart(fig_trend, use_container_width=True)
 
-            # 4. 每年的Top 5和Bottom 5（改为下拉选择）
+            # 4. 每年的Top 5和Bottom 5（下拉选择）
             st.divider()
             st.subheader("🏆 年度最佳与最差企业")
             
@@ -513,20 +571,24 @@ if page == "📈 全景统计概览":
                 bottom5.index = bottom5.index + 1
                 st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 2: 企业深度画像 (原企业详情查询) ---
+# --- 页面 2: 企业深度画像 (新增确定按钮) ---
 elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
     
-    col1, col2, col3 = st.columns([2, 1, 1])
+    # 输入框 + 确定按钮
+    col1, col2 = st.columns([3, 1])
     with col1:
         input_code = st.text_input(
             "请输入公司代码", 
             placeholder="例如：600759",
             label_visibility="collapsed"
         ).strip()
+    with col2:
+        search_button = st.button("🔍 查询企业", use_container_width=True)
     
-    if input_code:
+    # 只有点击按钮后才执行查询
+    if search_button and input_code:
         input_code = str(input_code).strip()
         company_data = st.session_state.df[st.session_state.df['code'] == input_code].sort_values('year')
         
@@ -820,7 +882,7 @@ elif page == "🏢 企业深度画像":
                 st.info("### 📌 改进建议")
                 st.markdown(formatted_suggestion)
 
-# --- 页面 3: 行业对标分析 (原四象限对标) ---
+# --- 页面 3: 行业对标分析 (优化按钮) ---
 elif page == "📊 行业对标分析":
     st.title("行业对标分析")
     st.markdown("基于经济绩效与碳披露绩效的四象限分析，直观展示企业在行业中的定位")
@@ -852,179 +914,183 @@ elif page == "📊 行业对标分析":
             value=2023
         )
     
-    input_code = st.text_input(
-        "请输入公司代码", 
-        placeholder="例如：600759"
-    ).strip()
+    # 输入框 + 生成按钮
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        input_code = st.text_input(
+            "请输入公司代码", 
+            placeholder="例如：600759",
+            label_visibility="collapsed"
+        ).strip()
+    with col2:
+        generate_button = st.button("📊 生成四象限分析", use_container_width=True)
     
-    if st.button("生成四象限分析图", type="primary"):
-        if not input_code:
-            st.error("请输入公司代码")
+    # 只有点击按钮后才执行分析
+    if generate_button and input_code:
+        input_code = str(input_code).strip()
+        target_df = st.session_state.df[(st.session_state.df['code'] == input_code) & (st.session_state.df['year'] == input_year)]
+        
+        if target_df.empty:
+            st.error(f"❌ 未找到公司代码为 {input_code} 的 {input_year} 年数据")
         else:
-            input_code = str(input_code).strip()
-            target_df = st.session_state.df[(st.session_state.df['code'] == input_code) & (st.session_state.df['year'] == input_year)]
+            target = target_df.iloc[0]
+            industry = target['industrycodec']
             
-            if target_df.empty:
-                st.error(f"❌ 未找到公司代码为 {input_code} 的 {input_year} 年数据")
+            peer_df = st.session_state.df[
+                (st.session_state.df['industrycodec'] == industry) & 
+                (st.session_state.df['year'] == input_year)
+            ].dropna(subset=[ECON_INDICATOR_CODE, '最终得分'])
+            
+            if len(peer_df) < 2:
+                st.warning(f"⚠️ 该行业({industry})当年样本量不足2家，无法进行有效对比分析")
             else:
-                target = target_df.iloc[0]
-                industry = target['industrycodec']
+                peer_df_sorted_econ = peer_df.sort_values(by=ECON_INDICATOR_CODE, ascending=False).reset_index(drop=True)
+                econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1
+                econ_total = len(peer_df_sorted_econ)
                 
-                peer_df = st.session_state.df[
-                    (st.session_state.df['industrycodec'] == industry) & 
-                    (st.session_state.df['year'] == input_year)
-                ].dropna(subset=[ECON_INDICATOR_CODE, '最终得分'])
+                peer_df_sorted_carbon = peer_df.sort_values(by='最终得分', ascending=False).reset_index(drop=True)
+                carbon_rank = (peer_df_sorted_carbon['code'] == target['code']).idxmax() + 1
+                carbon_total = len(peer_df_sorted_carbon)
                 
-                if len(peer_df) < 2:
-                    st.warning(f"⚠️ 该行业({industry})当年样本量不足2家，无法进行有效对比分析")
-                else:
-                    peer_df_sorted_econ = peer_df.sort_values(by=ECON_INDICATOR_CODE, ascending=False).reset_index(drop=True)
-                    econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1
-                    econ_total = len(peer_df_sorted_econ)
-                    
-                    peer_df_sorted_carbon = peer_df.sort_values(by='最终得分', ascending=False).reset_index(drop=True)
-                    carbon_rank = (peer_df_sorted_carbon['code'] == target['code']).idxmax() + 1
-                    carbon_total = len(peer_df_sorted_carbon)
-                    
-                    st.divider()
-                    st.subheader("📊 对标结果")
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.markdown(f"""
-                        <div class="metric-card">
-                            <h3 style="margin-top:0;">对标行业</h3>
-                            <p style="font-size:1.5rem; font-weight:700; margin:0;">{industry}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    with col2:
-                        st.markdown(f"""
-                        <div class="metric-card">
-                            <h3 style="margin-top:0;">{ECON_INDICATOR_NAME} 排名</h3>
-                            <p style="font-size:1.5rem; font-weight:700; margin:0;">{econ_rank}/{econ_total}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    with col3:
-                        st.markdown(f"""
-                        <div class="metric-card">
-                            <h3 style="margin-top:0;">碳披露得分 排名</h3>
-                            <p style="font-size:1.5rem; font-weight:700; margin:0;">{carbon_rank}/{carbon_total}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    median_econ = peer_df[ECON_INDICATOR_CODE].median()
-                    median_carbon = peer_df['最终得分'].median()
-                    
-                    is_high_econ = target[ECON_INDICATOR_CODE] >= median_econ
-                    is_high_carbon = target['最终得分'] >= median_carbon
-                    
-                    quadrant_info = {
-                        (True, True): ("🌟 双优型", "高经济绩效 · 高碳披露", "green"),
-                        (True, False): ("⚠️ 偏科型", "高经济绩效 · 低碳披露", "orange"),
-                        (False, True): ("💪 潜力型", "低经济绩效 · 高碳披露", "blue"),
-                        (False, False): ("🔴 落后型", "低经济绩效 · 低碳披露", "red")
-                    }
-                    
-                    quadrant_title, quadrant_desc, color = quadrant_info[(is_high_econ, is_high_carbon)]
-                    
+                st.divider()
+                st.subheader("📊 对标结果")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
                     st.markdown(f"""
-                    <div style="text-align:center; padding:2rem; background: linear-gradient(135deg, #F8FAFC 0%, #F0FDF4 100%); border-radius:16px; margin:1rem 0;">
-                        <h2 style="color:{color}; margin:0;">{quadrant_title}</h2>
-                        <p style="font-size:1.2rem; margin:0.5rem 0; color:#374151;">{quadrant_desc}</p>
+                    <div class="metric-card">
+                        <h3 style="margin-top:0;">对标行业</h3>
+                        <p style="font-size:1.5rem; font-weight:700; margin:0;">{industry}</p>
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                    fig = px.scatter(
-                        peer_df,
-                        x=ECON_INDICATOR_CODE,
-                        y='最终得分',
-                        hover_data=['公司名称', 'code'],
-                        title=f'{industry} 行业 {input_year} 年企业绩效分布图',
-                        labels={
-                            ECON_INDICATOR_CODE: ECON_INDICATOR_NAME,
-                            '最终得分': '碳披露最终得分'
-                        },
-                        opacity=0.6,
-                        color_discrete_sequence=['#94A3B8']
+                
+                with col2:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3 style="margin-top:0;">{ECON_INDICATOR_NAME} 排名</h3>
+                        <p style="font-size:1.5rem; font-weight:700; margin:0;">{econ_rank}/{econ_total}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                with col3:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3 style="margin-top:0;">碳披露得分 排名</h3>
+                        <p style="font-size:1.5rem; font-weight:700; margin:0;">{carbon_rank}/{carbon_total}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                median_econ = peer_df[ECON_INDICATOR_CODE].median()
+                median_carbon = peer_df['最终得分'].median()
+                
+                is_high_econ = target[ECON_INDICATOR_CODE] >= median_econ
+                is_high_carbon = target['最终得分'] >= median_carbon
+                
+                quadrant_info = {
+                    (True, True): ("🌟 双优型", "高经济绩效 · 高碳披露", "green"),
+                    (True, False): ("⚠️ 偏科型", "高经济绩效 · 低碳披露", "orange"),
+                    (False, True): ("💪 潜力型", "低经济绩效 · 高碳披露", "blue"),
+                    (False, False): ("🔴 落后型", "低经济绩效 · 低碳披露", "red")
+                }
+                
+                quadrant_title, quadrant_desc, color = quadrant_info[(is_high_econ, is_high_carbon)]
+                
+                st.markdown(f"""
+                <div style="text-align:center; padding:2rem; background: linear-gradient(135deg, #F8FAFC 0%, #F0FDF4 100%); border-radius:16px; margin:1rem 0;">
+                    <h2 style="color:{color}; margin:0;">{quadrant_title}</h2>
+                    <p style="font-size:1.2rem; margin:0.5rem 0; color:#374151;">{quadrant_desc}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                fig = px.scatter(
+                    peer_df,
+                    x=ECON_INDICATOR_CODE,
+                    y='最终得分',
+                    hover_data=['公司名称', 'code'],
+                    title=f'{industry} 行业 {input_year} 年企业绩效分布图',
+                    labels={
+                        ECON_INDICATOR_CODE: ECON_INDICATOR_NAME,
+                        '最终得分': '碳披露最终得分'
+                    },
+                    opacity=0.6,
+                    color_discrete_sequence=['#94A3B8']
+                )
+                
+                fig.add_scatter(
+                    x=[target[ECON_INDICATOR_CODE]],
+                    y=[target['最终得分']],
+                    mode='markers+text',
+                    marker=dict(size=20, color='#EF4444', symbol='star'),
+                    text=[target['公司名称']],
+                    textposition='top center',
+                    name='目标企业',
+                    textfont=dict(size=14, color='#EF4444', weight='bold')
+                )
+                
+                fig.add_vline(
+                    x=median_econ, 
+                    line_dash="dash", 
+                    line_color="#64748B", 
+                    line_width=2,
+                    annotation_text="行业中位数",
+                    annotation_position="top right"
+                )
+                fig.add_hline(
+                    y=median_carbon, 
+                    line_dash="dash", 
+                    line_color="#64748B", 
+                    line_width=2
+                )
+                
+                fig.add_annotation(
+                    x=peer_df[ECON_INDICATOR_CODE].max(),
+                    y=peer_df['最终得分'].max(),
+                    text="双优型",
+                    showarrow=False,
+                    font=dict(size=16, color="#059669", weight='bold')
+                )
+                fig.add_annotation(
+                    x=peer_df[ECON_INDICATOR_CODE].min(),
+                    y=peer_df['最终得分'].max(),
+                    text="潜力型",
+                    showarrow=False,
+                    font=dict(size=16, color="#2563EB", weight='bold')
+                )
+                fig.add_annotation(
+                    x=peer_df[ECON_INDICATOR_CODE].max(),
+                    y=peer_df['最终得分'].min(),
+                    text="偏科型",
+                    showarrow=False,
+                    font=dict(size=16, color="#D97706", weight='bold')
+                )
+                fig.add_annotation(
+                    x=peer_df[ECON_INDICATOR_CODE].min(),
+                    y=peer_df['最终得分'].min(),
+                    text="落后型",
+                    showarrow=False,
+                    font=dict(size=16, color="#DC2626", weight='bold')
+                )
+                
+                fig.update_layout(
+                    plot_bgcolor='white',
+                    paper_bgcolor='white',
+                    title_font=dict(size=18, color='#065F46'),
+                    showlegend=False,
+                    xaxis=dict(
+                        gridcolor='#F0F0F0',
+                        tickfont=dict(color='#1F2937'),
+                        title_font=dict(color='#1F2937')
+                    ),
+                    yaxis=dict(
+                        gridcolor='#F0F0F0',
+                        tickfont=dict(color='#1F2937'),
+                        title_font=dict(color='#1F2937')
                     )
-                    
-                    fig.add_scatter(
-                        x=[target[ECON_INDICATOR_CODE]],
-                        y=[target['最终得分']],
-                        mode='markers+text',
-                        marker=dict(size=20, color='#EF4444', symbol='star'),
-                        text=[target['公司名称']],
-                        textposition='top center',
-                        name='目标企业',
-                        textfont=dict(size=14, color='#EF4444', weight='bold')
-                    )
-                    
-                    fig.add_vline(
-                        x=median_econ, 
-                        line_dash="dash", 
-                        line_color="#64748B", 
-                        line_width=2,
-                        annotation_text="行业中位数",
-                        annotation_position="top right"
-                    )
-                    fig.add_hline(
-                        y=median_carbon, 
-                        line_dash="dash", 
-                        line_color="#64748B", 
-                        line_width=2
-                    )
-                    
-                    fig.add_annotation(
-                        x=peer_df[ECON_INDICATOR_CODE].max(),
-                        y=peer_df['最终得分'].max(),
-                        text="双优型",
-                        showarrow=False,
-                        font=dict(size=16, color="#059669", weight='bold')
-                    )
-                    fig.add_annotation(
-                        x=peer_df[ECON_INDICATOR_CODE].min(),
-                        y=peer_df['最终得分'].max(),
-                        text="潜力型",
-                        showarrow=False,
-                        font=dict(size=16, color="#2563EB", weight='bold')
-                    )
-                    fig.add_annotation(
-                        x=peer_df[ECON_INDICATOR_CODE].max(),
-                        y=peer_df['最终得分'].min(),
-                        text="偏科型",
-                        showarrow=False,
-                        font=dict(size=16, color="#D97706", weight='bold')
-                    )
-                    fig.add_annotation(
-                        x=peer_df[ECON_INDICATOR_CODE].min(),
-                        y=peer_df['最终得分'].min(),
-                        text="落后型",
-                        showarrow=False,
-                        font=dict(size=16, color="#DC2626", weight='bold')
-                    )
-                    
-                    fig.update_layout(
-                        plot_bgcolor='white',
-                        paper_bgcolor='white',
-                        title_font=dict(size=18, color='#065F46'),
-                        showlegend=False,
-                        xaxis=dict(
-                            gridcolor='#F0F0F0',
-                            tickfont=dict(color='#1F2937'),
-                            title_font=dict(color='#1F2937')
-                        ),
-                        yaxis=dict(
-                            gridcolor='#F0F0F0',
-                            tickfont=dict(color='#1F2937'),
-                            title_font=dict(color='#1F2937')
-                        )
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
 
-# --- 页面 4: 智能PDF打分 (原PDF自动打分) ---
+# --- 页面 4: 智能PDF打分 ---
 elif page == "🤖 智能PDF打分":
     st.title("智能PDF打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成专业分析报告")

@@ -12,7 +12,7 @@ import time
 import requests
 import matplotlib
 
-# ================= 0. 极简风格登录界面 =================
+# ================= 0. 极简纯净登录界面 =================
 def check_password():
     """返回用户是否输入了正确的密码"""
     if "password_correct" not in st.session_state:
@@ -21,10 +21,10 @@ def check_password():
     if not st.session_state.password_correct:
         st.set_page_config(page_title="ESG碳披露分析平台", page_icon="🌿", layout="centered")
         
-        # 极简CSS
+        # 纯净无框CSS
         st.markdown("""
         <style>
-            /* 干净的背景 */
+            /* 纯白背景 */
             .main {
                 background-color: #ffffff;
             }
@@ -79,7 +79,7 @@ def check_password():
                 transform: translateY(-1px);
             }
             
-            /* 隐藏默认的Streamlit元素 */
+            /* 隐藏Streamlit默认元素 */
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
@@ -114,6 +114,10 @@ def check_password():
     else:
         return True
 
+# 执行密码检查
+if not check_password():
+    st.stop()
+
 # ================= 1. 全局配置与主题设置 =================
 st.set_page_config(
     page_title="ESG碳披露分析平台", 
@@ -127,7 +131,7 @@ st.set_page_config(
     }
 )
 
-# 自定义CSS样式（升级美化版）
+# 全局CSS样式
 st.markdown("""
 <style>
     /* 全局字体 */
@@ -260,7 +264,7 @@ PROJECT_LIST = [
     "碳排放量或减排量披露"
 ]
 
-# ESG绿色配色方案（加深版）
+# ESG绿色配色方案
 ESG_COLORS = px.colors.sequential.Greens[3:]
 MAIN_COLOR = "#059669"
 
@@ -444,7 +448,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
 
 # ================= 5. 页面实现 =================
 
-# --- 页面 1: 全景统计概览 ---
+# --- 页面 1: 全景统计概览 (第一页) ---
 if page == "📈 全景统计概览":
     st.title("全景统计概览")
     st.markdown("展示2020-2025年碳披露分数的宏观趋势、描述性统计，以及每年表现最佳和最差的企业")
@@ -452,14 +456,14 @@ if page == "📈 全景统计概览":
     if st.session_state.df is None:
         st.warning("请先加载数据")
     else:
-        # 1. 筛选数据：2020-2025年
+        # 筛选数据：2020-2025年
         df_stats = st.session_state.df.copy()
         df_stats = df_stats[(df_stats['year'] >= 2020) & (df_stats['year'] <= 2025)]
         
         if df_stats.empty:
             st.info("暂无2020-2025年的数据")
         else:
-            # 2. 生成描述性统计表
+            # 生成描述性统计表
             st.subheader("📊 2020-2025年碳披露分数描述性统计")
             
             yearly_stats = df_stats.groupby('year')['最终得分'].agg([
@@ -476,7 +480,7 @@ if page == "📈 全景统计概览":
             
             st.dataframe(yearly_stats, use_container_width=True, hide_index=True)
 
-            # 3. 趋势图
+            # 趋势图
             st.subheader("📈 历年平均分与中位数趋势")
             fig_trend = go.Figure()
             
@@ -509,7 +513,7 @@ if page == "📈 全景统计概览":
             )
             st.plotly_chart(fig_trend, use_container_width=True)
 
-            # 4. 每年的Top 5和Bottom 5（下拉选择）
+            # 年度最佳与最差企业（下拉选择年份）
             st.divider()
             st.subheader("🏆 年度最佳与最差企业")
             
@@ -540,12 +544,12 @@ if page == "📈 全景统计概览":
                 bottom5.index = bottom5.index + 1
                 st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 2: 企业深度画像 (新增确定按钮) ---
+# --- 页面 2: 企业深度画像 (第二页) ---
 elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
     
-    # 输入框 + 确定按钮
+    # 输入框 + 查询按钮
     col1, col2 = st.columns([3, 1])
     with col1:
         input_code = st.text_input(
@@ -851,7 +855,7 @@ elif page == "🏢 企业深度画像":
                 st.info("### 📌 改进建议")
                 st.markdown(formatted_suggestion)
 
-# --- 页面 3: 行业对标分析 (优化按钮) ---
+# --- 页面 3: 行业对标分析 (第三页) ---
 elif page == "📊 行业对标分析":
     st.title("行业对标分析")
     st.markdown("基于经济绩效与碳披露绩效的四象限分析，直观展示企业在行业中的定位")
@@ -1059,7 +1063,7 @@ elif page == "📊 行业对标分析":
                 
                 st.plotly_chart(fig, use_container_width=True)
 
-# --- 页面 4: 智能PDF打分 ---
+# --- 页面 4: 智能PDF打分 (第四页) ---
 elif page == "🤖 智能PDF打分":
     st.title("智能PDF打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成专业分析报告")
@@ -1141,7 +1145,7 @@ elif page == "🤖 智能PDF打分":
                         extra_finance_data=finance_data
                     )
                     
-                    # ✅ 安全修复：新打分的code也转成字符串并去空格
+                    # 安全修复：新打分的code也转成字符串并去空格
                     result_row['code'] = str(stock_code).strip()
                     st.session_state.latest_score = result_row
                     st.success("✅ 打分完成！")

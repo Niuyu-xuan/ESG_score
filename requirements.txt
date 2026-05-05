@@ -6,3 +6,4 @@ numpy>=1.24.0
 pdfplumber>=0.10.0
 requests>=2.31.0
 rsconnect-python>=1.22.0  # 新增：用于部署的工具
+matplotlib>=3.9.2

@@ -1,5 +1,4 @@
 import streamlit as st
-import matplotlib
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -11,23 +10,90 @@ from io import BytesIO
 import pdfplumber
 import time
 import requests
+import matplotlib
 
-# ================= 0. 简单的密码验证 =================
+# ================= 0. 全新设计的密码验证与欢迎页 =================
 def check_password():
     """返回用户是否输入了正确的密码"""
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
     
     if not st.session_state.password_correct:
-        st.title("🔐 登录")
-        password = st.text_input("请输入访问密码", type="password")
+        # 全新设计的登录页
+        st.set_page_config(page_title="ESG碳披露分析平台", page_icon="🌿", layout="centered")
         
-        # 这里设置你想要的密码
-        if password == "ESG123":
-            st.session_state.password_correct = True
-            st.rerun()
-        elif password:
-            st.error("密码错误，请重试")
+        # 自定义CSS
+        st.markdown("""
+        <style>
+            .main {
+                background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+            }
+            .login-container {
+                max-width: 500px;
+                margin: 0 auto;
+                padding: 3rem 2rem;
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(16, 185, 129, 0.15);
+            }
+            .login-title {
+                text-align: center;
+                color: #065F46;
+                font-weight: 800;
+                margin-bottom: 0.5rem;
+            }
+            .login-subtitle {
+                text-align: center;
+                color: #64748B;
+                margin-bottom: 2rem;
+            }
+            .stButton > button {
+                background-color: #10B981;
+                color: white;
+                border-radius: 12px;
+                padding: 0.75rem 2rem;
+                font-weight: 600;
+                border: none;
+                width: 100%;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            }
+            .stButton > button:hover {
+                background-color: #059669;
+                box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+            }
+            .stTextInput > div > div > input {
+                border-radius: 10px;
+                border: 2px solid #D1FAE5;
+                padding: 0.75rem 1rem;
+            }
+            .stTextInput > div > div > input:focus {
+                border-color: #10B981;
+                box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col2:
+            st.markdown("""
+            <div class="login-container">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <span style="font-size: 4rem;">🌿</span>
+                </div>
+                <h1 class="login-title">ESG碳披露分析平台</h1>
+                <p class="login-subtitle">企业碳信息披露智能分析与可视化系统</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            password = st.text_input("请输入访问密码", type="password", placeholder="请输入密码以访问系统")
+            
+            if password:
+                if password == "ESG123":
+                    st.session_state.password_correct = True
+                    st.rerun()
+                else:
+                    st.error("❌ 密码错误，请重试")
+        
         return False
     else:
         return True
@@ -38,7 +104,8 @@ if not check_password():
 
 # ================= 1. 全局配置与主题设置 =================
 st.set_page_config(
-    page_title="企业ESG碳披露分析平台", 
+    page_title="ESG碳披露分析平台", 
+    page_icon="🌿",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -48,18 +115,18 @@ st.set_page_config(
     }
 )
 
-# 自定义CSS样式
+# 自定义CSS样式（升级美化版）
 st.markdown("""
 <style>
-    /* 全局字体：优先使用宋体，兼容Windows系统 */
+    /* 全局字体 */
     html, body, [class*="css"] {
-        font-family: 'SimSun', '宋体', sans-serif;
+        font-family: 'PingFang SC', 'Microsoft YaHei', 'SimSun', sans-serif;
     }
     
     /* 主标题样式 */
     h1 {
-        color: #0F5132;
-        font-weight: 700;
+        color: #065F46;
+        font-weight: 800;
         padding-bottom: 1rem;
         border-bottom: 3px solid #10B981;
     }
@@ -67,7 +134,7 @@ st.markdown("""
     /* 二级标题样式 */
     h2 {
         color: #065F46;
-        font-weight: 600;
+        font-weight: 700;
         margin-top: 2rem;
         margin-bottom: 1rem;
     }
@@ -80,58 +147,74 @@ st.markdown("""
     
     /* 卡片容器 */
     .metric-card {
-        background-color: #F0FDF4;
-        border-radius: 10px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #10B981;
+        background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+        border-radius: 16px;
+        padding: 1.75rem;
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.12);
+        border-left: 5px solid #10B981;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 32px rgba(16, 185, 129, 0.18);
     }
     
     /* 进度条美化 */
     .stProgress > div > div {
-        background-color: #10B981;
+        background: linear-gradient(90deg, #10B981, #059669);
     }
     
     /* 按钮美化 */
     .stButton > button {
-        background-color: #10B981;
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
         color: white;
-        border-radius: 8px;
-        padding: 0.5rem 2rem;
-        font-weight: 500;
+        border-radius: 12px;
+        padding: 0.6rem 2rem;
+        font-weight: 600;
         border: none;
-        box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
     
     .stButton > button:hover {
-        background-color: #059669;
-        box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
     }
     
     /* 侧边栏样式 */
     .css-1d391kg {
-        background-color: #F8FAFC;
+        background: linear-gradient(180deg, #F8FAFC 0%, #F0FDF4 100%);
     }
     
     /* 表格美化 */
     .dataframe {
-        border-radius: 8px;
+        border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
     }
     
     /* 折叠面板美化 */
     .streamlit-expanderHeader {
-        background-color: #F0FDF4;
-        border-radius: 8px;
-        font-weight: 500;
+        background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+        border-radius: 12px;
+        font-weight: 600;
     }
     
     /* 警告和信息框美化 */
     .stAlert {
-        border-radius: 8px;
+        border-radius: 12px;
         border: none;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+    
+    /* 选择框美化 */
+    .stSelectbox > div > div {
+        border-radius: 10px;
+        border: 2px solid #D1FAE5;
+    }
+    
+    .stSelectbox > div > div:hover {
+        border-color: #10B981;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -165,7 +248,7 @@ def format_esg_text(text):
     formatted = "\n".join([f"- {item}" for item in items])
     return formatted
 
-# ================= 3. 打分核心函数（直接合并到这里，避免导入问题）=================
+# ================= 3. 打分核心函数 =================
 def simple_score_pdf(pdf_file, api_key, company_name, report_year, 
                      industry_code, extra_finance_data=None):
     """
@@ -267,7 +350,7 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     
     return final_row
 
-# ================= 4. 侧边栏：自动读取本地小样本.xlsx（Streamlit兼容版） =================
+# ================= 4. 侧边栏：自动读取本地小样本.xlsx =================
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/000000/leaf.png", width=80)
     st.title("🌿 ESG碳披露分析")
@@ -281,7 +364,6 @@ with st.sidebar:
     @st.cache_data
     def load_local_excel():
         try:
-            # ✅ 关键：获取当前代码文件所在的绝对路径，保证Streamlit能找到文件
             current_dir = os.path.dirname(os.path.abspath(__file__))
             excel_path = os.path.join(current_dir, "小样本.xlsx")
             
@@ -311,12 +393,12 @@ with st.sidebar:
     st.subheader("🧭 功能导航")
     page = st.radio(
         "",
-        ["📄 企业详情查询", "📊 四象限对标分析", "📈 年度统计概览", "📝 PDF自动打分"],
+        ["📈 全景统计概览", "🏢 企业深度画像", "📊 行业对标分析", "🤖 智能PDF打分"],
         label_visibility="collapsed"
     )
 
 # 未加载文件时的提示
-if st.session_state.df is None and page != "📝 PDF自动打分":
+if st.session_state.df is None and page != "🤖 智能PDF打分":
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -335,25 +417,24 @@ if st.session_state.df is None and page != "📝 PDF自动打分":
 
 # ================= 5. 页面实现 =================
 
-# --- 页面 4: 年度统计概览 (新增) ---
-if page == "📈 年度统计概览":
-    st.title("年度碳披露统计概览")
-    st.markdown("展示2020-2024年碳披露分数的描述性统计，以及每年表现最佳和最差的企业")
+# --- 页面 1: 全景统计概览 (原年度统计，调整为第一页) ---
+if page == "📈 全景统计概览":
+    st.title("全景统计概览")
+    st.markdown("展示2020-2025年碳披露分数的宏观趋势、描述性统计，以及每年表现最佳和最差的企业")
 
     if st.session_state.df is None:
         st.warning("请先加载数据")
     else:
-        # 1. 筛选数据：只保留2020-2024年
+        # 1. 筛选数据：2020-2025年
         df_stats = st.session_state.df.copy()
-        df_stats = df_stats[(df_stats['year'] >= 2020) & (df_stats['year'] <= 2024)]
+        df_stats = df_stats[(df_stats['year'] >= 2020) & (df_stats['year'] <= 2025)]
         
         if df_stats.empty:
-            st.info("暂无2020-2024年的数据")
+            st.info("暂无2020-2025年的数据")
         else:
             # 2. 生成描述性统计表
-            st.subheader("📊 2020-2024年碳披露分数描述性统计")
+            st.subheader("📊 2020-2025年碳披露分数描述性统计")
             
-            # 按年份分组计算统计量
             yearly_stats = df_stats.groupby('year')['最终得分'].agg([
                 ('企业数量', 'count'),
                 ('平均分', 'mean'),
@@ -363,22 +444,10 @@ if page == "📈 年度统计概览":
                 ('最高分', 'max')
             ]).round(2)
             
-            # 重置索引，让年份变成普通列
             yearly_stats = yearly_stats.reset_index()
             yearly_stats = yearly_stats.rename(columns={'year': '年份'})
             
-            # 美化表格
-            st.dataframe(
-                yearly_stats.style.format({
-                    '平均分': '{:.2f}',
-                    '中位数': '{:.2f}',
-                    '标准差': '{:.2f}',
-                    '最低分': '{:.2f}',
-                    '最高分': '{:.2f}'
-                }).background_gradient(cmap='Greens', subset=['平均分', '中位数']),
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(yearly_stats, use_container_width=True, hide_index=True)
 
             # 3. 趋势图
             st.subheader("📈 历年平均分与中位数趋势")
@@ -403,7 +472,7 @@ if page == "📈 年度统计概览":
             ))
             
             fig_trend.update_layout(
-                title='2020-2024年碳披露分数趋势',
+                title='2020-2025年碳披露分数趋势',
                 xaxis_title='年份',
                 yaxis_title='分数',
                 plot_bgcolor='white',
@@ -413,281 +482,41 @@ if page == "📈 年度统计概览":
             )
             st.plotly_chart(fig_trend, use_container_width=True)
 
-            # 4. 每年的Top 5和Bottom 5
+            # 4. 每年的Top 5和Bottom 5（改为下拉选择）
             st.divider()
-            st.subheader("🏆 每年碳披露分数最高/最低的企业")
+            st.subheader("🏆 年度最佳与最差企业")
             
-            # 获取所有年份
             available_years = sorted(df_stats['year'].unique())
-            
-            for year in available_years:
-                st.markdown(f"### 📅 {year}年")
-                
-                # 筛选当年数据并去重（取每家公司当年的最后一条记录）
-                df_year = df_stats[df_stats['year'] == year].copy()
-                # 按公司代码去重，保留最后一条
-                df_year = df_year.sort_values('最终得分').drop_duplicates('code', keep='last')
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.success("#### ✅ 分数最高的企业")
-                    # 按分数降序，取前5
-                    top5 = df_year.nlargest(5, '最终得分')[['公司名称', 'code', '最终得分', '评级']].reset_index(drop=True)
-                    top5.index = top5.index + 1  # 索引从1开始
-                    st.dataframe(
-                        top5.style.format({'最终得分': '{:.2f}'}),
-                        use_container_width=True
-                    )
-                
-                with col2:
-                    st.error("#### ❌ 分数最低的企业")
-                    # 按分数升序，取前5
-                    bottom5 = df_year.nsmallest(5, '最终得分')[['公司名称', 'code', '最终得分', '评级']].reset_index(drop=True)
-                    bottom5.index = bottom5.index + 1  # 索引从1开始
-                    st.dataframe(
-                        bottom5.style.format({'最终得分': '{:.2f}'}),
-                        use_container_width=True
-                    )
-                
-                st.divider()
-
-# --- 页面 3: PDF自动打分 ---
-elif page == "📝 PDF自动打分":
-    st.title("ESG报告PDF自动打分")
-    st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成分析报告")
-    
-    # 1. API密钥输入
-    st.subheader("🔑 API配置")
-    api_key = st.text_input(
-        "NVIDIA API Key", 
-        type="password",
-        help="你的NVIDIA API密钥，用于调用GPT-OSS-120B模型"
-    )
-    
-    st.divider()
-    
-    # 2. PDF上传
-    st.subheader("📄 1. 上传ESG报告")
-    pdf_file = st.file_uploader("选择PDF文件", type=["pdf"])
-    
-    st.divider()
-    
-    # 3. 企业基本信息
-    st.subheader("🏢 2. 填写企业基本信息")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        company_name = st.text_input("公司名称", placeholder="例如：洲际油气")
-    with col2:
-        report_year = st.number_input("报告年份", min_value=2015, max_value=2030, value=2024)
-    with col3:
-        stock_code = st.text_input("股票代码 (code)", placeholder="例如：600759")
-    with col4:
-        industry_code = st.text_input("行业代码 (industrycodec)", placeholder="例如：B07")
-    
-    st.divider()
-    
-    # 4. 财务指标输入
-    st.subheader("💰 3. 补充财务指标（选填）")
-    st.info("如果不填写，打分后无法进行四象限分析，但不影响详情查询功能")
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        f050201b = st.number_input("总资产净利润率 (ROA)", format="%.4f", help="F050201B")
-    with col2:
-        f050501b = st.number_input("净资产收益率 (ROE)", format="%.4f", help="F050501B")
-    with col3:
-        f051501b = st.number_input("营业净利率", format="%.4f", help="F051501B")
-    with col4:
-        f053301b = st.number_input("营业毛利率", format="%.4f", help="F053301B")
-    with col5:
-        f051201b = st.number_input("投入资本回报率 (ROIC)", format="%.4f", help="F051201B")
-    
-    finance_data = {
-        'F050201B': f050201b,
-        'F050501B': f050501b,
-        'F051501B': f051501b,
-        'F053301B': f053301b,
-        'F051201B': f051201b
-    }
-    
-    st.divider()
-    
-    # 5. 打分按钮
-    if st.button("🚀 开始AI智能打分", type="primary", use_container_width=True):
-        if not api_key or len(api_key) < 20:
-            st.error("❌ 请输入有效的NVIDIA API Key")
-        elif not pdf_file:
-            st.error("❌ 请上传ESG报告PDF文件")
-        elif not company_name:
-            st.error("❌ 请填写公司名称")
-        else:
-            try:
-                with st.spinner("正在解析PDF并调用AI模型打分（预计需要3-10分钟，请耐心等待）..."):
-                    # 直接调用本文件中的函数
-                    result_row = simple_score_pdf(
-                        pdf_file=pdf_file,
-                        api_key=api_key,
-                        company_name=company_name,
-                        report_year=report_year,
-                        industry_code=industry_code,
-                        extra_finance_data=finance_data
-                    )
-                    
-                    # ✅ 安全修复：新打分的code也转成字符串并去空格
-                    result_row['code'] = str(stock_code).strip()
-                    st.session_state.latest_score = result_row
-                    st.success("✅ 打分完成！")
-            
-            except Exception as e:
-                st.error(f"❌ 打分失败：{str(e)}")
-                st.info("💡 请检查：1. API Key是否正确 2. PDF是否可读取 3. 网络连接是否正常")
-    
-    # 6. 显示打分结果
-    if 'latest_score' in st.session_state:
-        result = st.session_state.latest_score
-        
-        st.divider()
-        st.subheader("📊 打分结果预览")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="margin-top:0; color:#065F46;">公司名称</h3>
-                <p style="font-size:1.2rem; font-weight:700; margin:0; color:#10B981;">{result['公司名称']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="margin-top:0; color:#065F46;">报告年份</h3>
-                <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['year']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="margin-top:0; color:#065F46;">最终得分</h3>
-                <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['最终得分']}/20</p>
-            </div>
-            """, unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h3 style="margin-top:0; color:#065F46;">评级</h3>
-                <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['评级']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.subheader("各维度得分明细")
-        score_data = []
-        for proj in PROJECT_LIST:
-            score_data.append({
-                '项目': proj,
-                '得分': result[f"项目_{proj}_得分"],
-                '满分': result[f"项目_{proj}_满分"],
-                '得分率': f"{result[f'项目_{proj}_得分']/result[f'项目_{proj}_满分']:.0%}"
-            })
-        score_df = pd.DataFrame(score_data)
-        st.dataframe(score_df, use_container_width=True, hide_index=True)
-
-        # ======================
-        # ✅【修复】这里新增：完整文字评价输出（和第一个界面完全一样）
-        # ======================
-        st.divider()
-        st.subheader("📝 详细评分明细 & 文字评价")
-        for proj_name in PROJECT_LIST:
-            col_score = f"项目_{proj_name}_得分"
-            col_full = f"项目_{proj_name}_满分"
-            col_reason = f"项目_{proj_name}_评分理由"
-            col_evidence = f"项目_{proj_name}_证据"
-            
-            score_val = result[col_score]
-            full_val = result[col_full]
-            progress = score_val / full_val if full_val > 0 else 0
-            
-            with st.expander(f"{proj_name} ({score_val}/{full_val})"):
-                st.progress(progress, text=f"得分水平: {progress:.1%}")
-                st.markdown(f"**评分理由**: {result[col_reason]}")
-                st.markdown(f"**证据**: {result[col_evidence]}")
-
-        # 综合评价
-        st.subheader("📄 综合评价")
-        st.write(result.get('综合评价', '暂无评价'))
-
-        # 核心优势 / 问题 / 建议（和企业详情页完全一致样式）
-        st.subheader("💡 核心优势、问题与改进建议")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.success("### ✅ 核心优势")
-            st.markdown(format_esg_text(result.get('核心优势', '')))
-        with col2:
-            st.warning("### ⚠️ 核心问题")
-            st.markdown(format_esg_text(result.get('核心问题', '')))
-        with col3:
-            st.info("### 📌 改进建议")
-            st.markdown(format_esg_text(result.get('改进建议', '')))
-        # ======================
-        # ✅ 修复结束
-        # ======================
-        
-        st.divider()
-        col1, col2 = st.columns(2)
-        
-        # ======================
-        # ✅ 合并数据功能
-        # ======================
-        with col1:
-            if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
-                if st.session_state.df is None:
-                    st.warning("小样本未加载，无法合并")
-                else:
-                    new_code = result['code']
-                    new_year = result['year']
-                    df = st.session_state.df.copy()
-                    df['code'] = df['code'].astype(str).str.strip()
-
-                    original_count = len(df)
-                    mask = (df['code'] == new_code) & (df['year'] == new_year)
-                    duplicate_count = mask.sum()
-
-                    if duplicate_count > 0:
-                        df = df[~mask].copy()
-
-                    new_row = pd.DataFrame([result])
-                    df_final = pd.concat([df, new_row], ignore_index=True)
-
-                    st.session_state.df = df_final
-                    load_local_excel.clear()
-
-                    st.success("✅ 合并成功！（已自动覆盖旧数据）")
-                    st.write(f"• 合并前：{original_count} 条")
-                    if duplicate_count > 0:
-                        st.write(f"• 覆盖了 {duplicate_count} 条旧数据（同公司 {new_code} 且同年 {new_year}）")
-                    else:
-                        st.write(f"• 未发现重复，直接新增")
-                    st.write(f"• 合并后：{len(df_final)} 条")
-                    st.info(f"现在去【企业详情查询】输入 {new_code} 查看最新数据")
-        
-        with col2:
-            def convert_single_row(row):
-                output = BytesIO()
-                pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
-                return output.getvalue()
-            
-            excel_data = convert_single_row(result)
-            st.download_button(
-                label="📥 下载单条结果Excel",
-                data=excel_data,
-                file_name=f"{result['公司名称']}_{result['year']}_ESG碳披露评分结果.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+            selected_year = st.selectbox(
+                "请选择年份",
+                options=available_years,
+                index=len(available_years)-1
             )
+            
+            st.markdown(f"### 📅 {selected_year}年")
+            
+            # 筛选当年数据并去重
+            df_year = df_stats[df_stats['year'] == selected_year].copy()
+            df_year = df_year.sort_values('最终得分').drop_duplicates('code', keep='last')
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.success("#### ✅ 碳披露表现最佳的企业")
+                top5 = df_year.nlargest(5, '最终得分')[['公司名称', 'code', '最终得分', '评级']].reset_index(drop=True)
+                top5.index = top5.index + 1
+                st.dataframe(top5, use_container_width=True)
+            
+            with col2:
+                st.error("#### ❌ 碳披露表现待改进的企业")
+                bottom5 = df_year.nsmallest(5, '最终得分')[['公司名称', 'code', '最终得分', '评级']].reset_index(drop=True)
+                bottom5.index = bottom5.index + 1
+                st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 1: 企业详情查询 ---
-elif page == "📄 企业详情查询":
-    st.title("企业ESG报告碳披露详情")
+# --- 页面 2: 企业深度画像 (原企业详情查询) ---
+elif page == "🏢 企业深度画像":
+    st.title("企业深度画像")
+    st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
     
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
@@ -703,7 +532,7 @@ elif page == "📄 企业详情查询":
         
         if company_data.empty:
             st.error(f"❌ 未找到公司代码为 {input_code} 的数据")
-            st.info("💡 请在左侧边栏查看可用公司代码，或在【PDF自动打分】页面添加新数据")
+            st.info("💡 请在左侧边栏查看可用公司代码，或在【智能PDF打分】页面添加新数据")
         else:
             company_name = company_data['公司名称'].iloc[0]
             industry_code = company_data['industrycodec'].iloc[0]
@@ -991,9 +820,10 @@ elif page == "📄 企业详情查询":
                 st.info("### 📌 改进建议")
                 st.markdown(formatted_suggestion)
 
-# --- 页面 2: 四象限对标分析 ---
-elif page == "📊 四象限对标分析":
-    st.title("经济绩效与碳披露绩效四象限分析")
+# --- 页面 3: 行业对标分析 (原四象限对标) ---
+elif page == "📊 行业对标分析":
+    st.title("行业对标分析")
+    st.markdown("基于经济绩效与碳披露绩效的四象限分析，直观展示企业在行业中的定位")
     
     st.subheader("📌 分析指标设置")
     col1, col2 = st.columns(2)
@@ -1100,7 +930,7 @@ elif page == "📊 四象限对标分析":
                     quadrant_title, quadrant_desc, color = quadrant_info[(is_high_econ, is_high_carbon)]
                     
                     st.markdown(f"""
-                    <div style="text-align:center; padding:2rem; background-color:#F8FAFC; border-radius:10px; margin:1rem 0;">
+                    <div style="text-align:center; padding:2rem; background: linear-gradient(135deg, #F8FAFC 0%, #F0FDF4 100%); border-radius:16px; margin:1rem 0;">
                         <h2 style="color:{color}; margin:0;">{quadrant_title}</h2>
                         <p style="font-size:1.2rem; margin:0.5rem 0; color:#374151;">{quadrant_desc}</p>
                     </div>
@@ -1193,3 +1023,227 @@ elif page == "📊 四象限对标分析":
                     )
                     
                     st.plotly_chart(fig, use_container_width=True)
+
+# --- 页面 4: 智能PDF打分 (原PDF自动打分) ---
+elif page == "🤖 智能PDF打分":
+    st.title("智能PDF打分")
+    st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成专业分析报告")
+    
+    # 1. API密钥输入
+    st.subheader("🔑 API配置")
+    api_key = st.text_input(
+        "NVIDIA API Key", 
+        type="password",
+        help="你的NVIDIA API密钥，用于调用GPT-OSS-120B模型"
+    )
+    
+    st.divider()
+    
+    # 2. PDF上传
+    st.subheader("📄 1. 上传ESG报告")
+    pdf_file = st.file_uploader("选择PDF文件", type=["pdf"])
+    
+    st.divider()
+    
+    # 3. 企业基本信息
+    st.subheader("🏢 2. 填写企业基本信息")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        company_name = st.text_input("公司名称", placeholder="例如：洲际油气")
+    with col2:
+        report_year = st.number_input("报告年份", min_value=2015, max_value=2030, value=2024)
+    with col3:
+        stock_code = st.text_input("股票代码 (code)", placeholder="例如：600759")
+    with col4:
+        industry_code = st.text_input("行业代码 (industrycodec)", placeholder="例如：B07")
+    
+    st.divider()
+    
+    # 4. 财务指标输入
+    st.subheader("💰 3. 补充财务指标（选填）")
+    st.info("如果不填写，打分后无法进行四象限分析，但不影响详情查询功能")
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        f050201b = st.number_input("总资产净利润率 (ROA)", format="%.4f", help="F050201B")
+    with col2:
+        f050501b = st.number_input("净资产收益率 (ROE)", format="%.4f", help="F050501B")
+    with col3:
+        f051501b = st.number_input("营业净利率", format="%.4f", help="F051501B")
+    with col4:
+        f053301b = st.number_input("营业毛利率", format="%.4f", help="F053301B")
+    with col5:
+        f051201b = st.number_input("投入资本回报率 (ROIC)", format="%.4f", help="F051201B")
+    
+    finance_data = {
+        'F050201B': f050201b,
+        'F050501B': f050501b,
+        'F051501B': f051501b,
+        'F053301B': f053301b,
+        'F051201B': f051201b
+    }
+    
+    st.divider()
+    
+    # 5. 打分按钮
+    if st.button("🚀 开始AI智能打分", type="primary", use_container_width=True):
+        if not api_key or len(api_key) < 20:
+            st.error("❌ 请输入有效的NVIDIA API Key")
+        elif not pdf_file:
+            st.error("❌ 请上传ESG报告PDF文件")
+        elif not company_name:
+            st.error("❌ 请填写公司名称")
+        else:
+            try:
+                with st.spinner("正在解析PDF并调用AI模型打分（预计需要3-10分钟，请耐心等待）..."):
+                    # 直接调用本文件中的函数
+                    result_row = simple_score_pdf(
+                        pdf_file=pdf_file,
+                        api_key=api_key,
+                        company_name=company_name,
+                        report_year=report_year,
+                        industry_code=industry_code,
+                        extra_finance_data=finance_data
+                    )
+                    
+                    # ✅ 安全修复：新打分的code也转成字符串并去空格
+                    result_row['code'] = str(stock_code).strip()
+                    st.session_state.latest_score = result_row
+                    st.success("✅ 打分完成！")
+            
+            except Exception as e:
+                st.error(f"❌ 打分失败：{str(e)}")
+                st.info("💡 请检查：1. API Key是否正确 2. PDF是否可读取 3. 网络连接是否正常")
+    
+    # 6. 显示打分结果
+    if 'latest_score' in st.session_state:
+        result = st.session_state.latest_score
+        
+        st.divider()
+        st.subheader("📊 打分结果预览")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="margin-top:0; color:#065F46;">公司名称</h3>
+                <p style="font-size:1.2rem; font-weight:700; margin:0; color:#10B981;">{result['公司名称']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="margin-top:0; color:#065F46;">报告年份</h3>
+                <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['year']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="margin-top:0; color:#065F46;">最终得分</h3>
+                <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['最终得分']}/20</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with col4:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3 style="margin-top:0; color:#065F46;">评级</h3>
+                <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{result['评级']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.subheader("各维度得分明细")
+        score_data = []
+        for proj in PROJECT_LIST:
+            score_data.append({
+                '项目': proj,
+                '得分': result[f"项目_{proj}_得分"],
+                '满分': result[f"项目_{proj}_满分"],
+                '得分率': f"{result[f'项目_{proj}_得分']/result[f'项目_{proj}_满分']:.0%}"
+            })
+        score_df = pd.DataFrame(score_data)
+        st.dataframe(score_df, use_container_width=True, hide_index=True)
+
+        st.divider()
+        st.subheader("📝 详细评分明细 & 文字评价")
+        for proj_name in PROJECT_LIST:
+            col_score = f"项目_{proj_name}_得分"
+            col_full = f"项目_{proj_name}_满分"
+            col_reason = f"项目_{proj_name}_评分理由"
+            col_evidence = f"项目_{proj_name}_证据"
+            
+            score_val = result[col_score]
+            full_val = result[col_full]
+            progress = score_val / full_val if full_val > 0 else 0
+            
+            with st.expander(f"{proj_name} ({score_val}/{full_val})"):
+                st.progress(progress, text=f"得分水平: {progress:.1%}")
+                st.markdown(f"**评分理由**: {result[col_reason]}")
+                st.markdown(f"**证据**: {result[col_evidence]}")
+
+        # 综合评价
+        st.subheader("📄 综合评价")
+        st.write(result.get('综合评价', '暂无评价'))
+
+        # 核心优势 / 问题 / 建议
+        st.subheader("💡 核心优势、问题与改进建议")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.success("### ✅ 核心优势")
+            st.markdown(format_esg_text(result.get('核心优势', '')))
+        with col2:
+            st.warning("### ⚠️ 核心问题")
+            st.markdown(format_esg_text(result.get('核心问题', '')))
+        with col3:
+            st.info("### 📌 改进建议")
+            st.markdown(format_esg_text(result.get('改进建议', '')))
+        
+        st.divider()
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
+                if st.session_state.df is None:
+                    st.warning("小样本未加载，无法合并")
+                else:
+                    new_code = result['code']
+                    new_year = result['year']
+                    df = st.session_state.df.copy()
+                    df['code'] = df['code'].astype(str).str.strip()
+
+                    original_count = len(df)
+                    mask = (df['code'] == new_code) & (df['year'] == new_year)
+                    duplicate_count = mask.sum()
+
+                    if duplicate_count > 0:
+                        df = df[~mask].copy()
+
+                    new_row = pd.DataFrame([result])
+                    df_final = pd.concat([df, new_row], ignore_index=True)
+
+                    st.session_state.df = df_final
+                    load_local_excel.clear()
+
+                    st.success("✅ 合并成功！（已自动覆盖旧数据）")
+                    st.write(f"• 合并前：{original_count} 条")
+                    if duplicate_count > 0:
+                        st.write(f"• 覆盖了 {duplicate_count} 条旧数据（同公司 {new_code} 且同年 {new_year}）")
+                    else:
+                        st.write(f"• 未发现重复，直接新增")
+                    st.write(f"• 合并后：{len(df_final)} 条")
+                    st.info(f"现在去【企业深度画像】输入 {new_code} 查看最新数据")
+        
+        with col2:
+            def convert_single_row(row):
+                output = BytesIO()
+                pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
+                return output.getvalue()
+            
+            excel_data = convert_single_row(result)
+            st.download_button(
+                label="📥 下载单条结果Excel",
+                data=excel_data,
+                file_name=f"{result['公司名称']}_{result['year']}_ESG碳披露评分结果.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )

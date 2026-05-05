@@ -12,7 +12,7 @@ import time
 import requests
 import matplotlib
 
-# ================= 0. 全新升级的登录界面 =================
+# ================= 0. 极简风格登录界面 =================
 def check_password():
     """返回用户是否输入了正确的密码"""
     if "password_correct" not in st.session_state:
@@ -21,28 +21,12 @@ def check_password():
     if not st.session_state.password_correct:
         st.set_page_config(page_title="ESG碳披露分析平台", page_icon="🌿", layout="centered")
         
-        # 全新高级CSS
+        # 极简CSS
         st.markdown("""
         <style>
-            /* 全局背景：渐变+模糊效果 */
+            /* 干净的背景 */
             .main {
-                background: linear-gradient(135deg, #065F46 0%, #10B981 50%, #34D399 100%);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            /* 登录卡片：玻璃拟态效果 */
-            .login-card {
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(20px);
-                border-radius: 24px;
-                padding: 3rem 2.5rem;
-                box-shadow: 0 25px 80px rgba(0, 0, 0, 0.2);
-                max-width: 480px;
-                width: 100%;
-                border: 1px solid rgba(255, 255, 255, 0.3);
+                background-color: #ffffff;
             }
             
             /* 标题样式 */
@@ -50,7 +34,7 @@ def check_password():
                 text-align: center;
                 color: #065F46;
                 font-weight: 800;
-                font-size: 2.2rem;
+                font-size: 2.5rem;
                 margin-bottom: 0.5rem;
             }
             
@@ -64,44 +48,35 @@ def check_password():
             
             /* 输入框美化 */
             .stTextInput > div > div > input {
-                border-radius: 14px;
+                border-radius: 12px;
                 border: 2px solid #E5E7EB;
                 padding: 1rem 1.25rem;
                 font-size: 1rem;
-                transition: all 0.3s ease;
-                background-color: #F9FAFB;
+                transition: all 0.2s ease;
             }
             
             .stTextInput > div > div > input:focus {
                 border-color: #10B981;
-                box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
-                background-color: white;
+                box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
             }
             
             /* 按钮美化 */
             .stButton > button {
                 background: linear-gradient(135deg, #10B981 0%, #059669 100%);
                 color: white;
-                border-radius: 14px;
-                padding: 1rem 2rem;
+                border-radius: 12px;
+                padding: 0.85rem 2rem;
                 font-weight: 700;
                 font-size: 1.1rem;
                 border: none;
                 width: 100%;
-                box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
-                transition: all 0.3s ease;
-                margin-top: 1rem;
+                transition: all 0.2s ease;
+                margin-top: 0.5rem;
             }
             
             .stButton > button:hover {
                 background: linear-gradient(135deg, #059669 0%, #047857 100%);
-                box-shadow: 0 12px 28px rgba(16, 185, 129, 0.4);
-                transform: translateY(-2px);
-            }
-            
-            .stButton > button:active {
-                transform: translateY(0);
-                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+                transform: translateY(-1px);
             }
             
             /* 隐藏默认的Streamlit元素 */
@@ -111,16 +86,14 @@ def check_password():
         </style>
         """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([1, 6, 1])
+        col1, col2, col3 = st.columns([1, 4, 1])
         with col2:
             st.markdown("""
-            <div class="login-card">
-                <div style="text-align: center; margin-bottom: 2rem;">
-                    <span style="font-size: 5rem;">🌿</span>
-                </div>
-                <h1 class="login-title">ESG碳披露分析平台</h1>
-                <p class="login-subtitle">企业碳信息披露智能分析与可视化系统<br>专业 · 高效 · 精准</p>
+            <div style="text-align: center; margin-bottom: 2rem; padding-top: 4rem;">
+                <span style="font-size: 6rem;">🌿</span>
             </div>
+            <h1 class="login-title">ESG碳披露分析平台</h1>
+            <p class="login-subtitle">企业碳信息披露智能分析与可视化系统</p>
             """, unsafe_allow_html=True)
             
             password = st.text_input(
@@ -140,10 +113,6 @@ def check_password():
         return False
     else:
         return True
-
-# 执行密码检查
-if not check_password():
-    st.stop()
 
 # ================= 1. 全局配置与主题设置 =================
 st.set_page_config(

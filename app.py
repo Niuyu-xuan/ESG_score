@@ -310,7 +310,7 @@ with st.sidebar:
     st.subheader("🧭 功能导航")
     page = st.radio(
         "",
-        ["📄 企业详情查询", "📊 四象限对标分析", "📝 PDF自动打分"],
+        ["📄 企业详情查询", "📊 四象限对标分析", "📈 年度统计概览", "📝 PDF自动打分"],
         label_visibility="collapsed"
     )
 
@@ -327,14 +327,132 @@ if st.session_state.df is None and page != "📝 PDF自动打分":
         st.write("✅ 单企业历年多维度趋势分析")
         st.write("✅ 单年详细评分与雷达图展示")
         st.write("✅ 行业经济绩效与碳披露四象限对标")
+        st.write("✅ 年度碳披露描述性统计与Top/Bottom 5")
         st.markdown("<br>", unsafe_allow_html=True)
         st.info("ℹ️ 小样本.xlsx未加载，仅可使用PDF打分功能")
         st.stop()
 
 # ================= 5. 页面实现 =================
 
+# --- 页面 4: 年度统计概览 (新增) ---
+if page == "📈 年度统计概览":
+    st.title("年度碳披露统计概览")
+    st.markdown("展示2020-2024年碳披露分数的描述性统计，以及每年表现最佳和最差的企业")
+
+    if st.session_state.df is None:
+        st.warning("请先加载数据")
+    else:
+        # 1. 筛选数据：只保留2020-2024年
+        df_stats = st.session_state.df.copy()
+        df_stats = df_stats[(df_stats['year'] >= 2020) & (df_stats['year'] <= 2024)]
+        
+        if df_stats.empty:
+            st.info("暂无2020-2024年的数据")
+        else:
+            # 2. 生成描述性统计表
+            st.subheader("📊 2020-2024年碳披露分数描述性统计")
+            
+            # 按年份分组计算统计量
+            yearly_stats = df_stats.groupby('year')['最终得分'].agg([
+                ('企业数量', 'count'),
+                ('平均分', 'mean'),
+                ('中位数', 'median'),
+                ('标准差', 'std'),
+                ('最低分', 'min'),
+                ('最高分', 'max')
+            ]).round(2)
+            
+            # 重置索引，让年份变成普通列
+            yearly_stats = yearly_stats.reset_index()
+            yearly_stats = yearly_stats.rename(columns={'year': '年份'})
+            
+            # 美化表格
+            st.dataframe(
+                yearly_stats.style.format({
+                    '平均分': '{:.2f}',
+                    '中位数': '{:.2f}',
+                    '标准差': '{:.2f}',
+                    '最低分': '{:.2f}',
+                    '最高分': '{:.2f}'
+                }).background_gradient(cmap='Greens', subset=['平均分', '中位数']),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # 3. 趋势图
+            st.subheader("📈 历年平均分与中位数趋势")
+            fig_trend = go.Figure()
+            
+            fig_trend.add_trace(go.Scatter(
+                x=yearly_stats['年份'],
+                y=yearly_stats['平均分'],
+                mode='lines+markers',
+                name='平均分',
+                line=dict(color='#059669', width=4),
+                marker=dict(size=12)
+            ))
+            
+            fig_trend.add_trace(go.Scatter(
+                x=yearly_stats['年份'],
+                y=yearly_stats['中位数'],
+                mode='lines+markers',
+                name='中位数',
+                line=dict(color='#10B981', width=4, dash='dash'),
+                marker=dict(size=12)
+            ))
+            
+            fig_trend.update_layout(
+                title='2020-2024年碳披露分数趋势',
+                xaxis_title='年份',
+                yaxis_title='分数',
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                xaxis=dict(tickmode='array', tickvals=yearly_stats['年份']),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig_trend, use_container_width=True)
+
+            # 4. 每年的Top 5和Bottom 5
+            st.divider()
+            st.subheader("🏆 每年碳披露分数最高/最低的企业")
+            
+            # 获取所有年份
+            available_years = sorted(df_stats['year'].unique())
+            
+            for year in available_years:
+                st.markdown(f"### 📅 {year}年")
+                
+                # 筛选当年数据并去重（取每家公司当年的最后一条记录）
+                df_year = df_stats[df_stats['year'] == year].copy()
+                # 按公司代码去重，保留最后一条
+                df_year = df_year.sort_values('最终得分').drop_duplicates('code', keep='last')
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.success("#### ✅ 分数最高的企业")
+                    # 按分数降序，取前5
+                    top5 = df_year.nlargest(5, '最终得分')[['公司名称', 'code', '最终得分', '评级']].reset_index(drop=True)
+                    top5.index = top5.index + 1  # 索引从1开始
+                    st.dataframe(
+                        top5.style.format({'最终得分': '{:.2f}'}),
+                        use_container_width=True
+                    )
+                
+                with col2:
+                    st.error("#### ❌ 分数最低的企业")
+                    # 按分数升序，取前5
+                    bottom5 = df_year.nsmallest(5, '最终得分')[['公司名称', 'code', '最终得分', '评级']].reset_index(drop=True)
+                    bottom5.index = bottom5.index + 1  # 索引从1开始
+                    st.dataframe(
+                        bottom5.style.format({'最终得分': '{:.2f}'}),
+                        use_container_width=True
+                    )
+                
+                st.divider()
+
 # --- 页面 3: PDF自动打分 ---
-if page == "📝 PDF自动打分":
+elif page == "📝 PDF自动打分":
     st.title("ESG报告PDF自动打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成分析报告")
     

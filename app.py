@@ -396,7 +396,7 @@ with st.sidebar:
     def load_local_excel():
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            excel_path = os.path.join(current_dir, "前端样本1.xlsx")
+            excel_path = os.path.join(current_dir, "前端样本3.xlsx")
             
             df = pd.read_excel(excel_path)
             df['code'] = df['code'].astype(str).str.strip()

@@ -544,7 +544,7 @@ if page == "📈 全景统计概览":
                 bottom5.index = bottom5.index + 1
                 st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 2: 企业深度画像 (第二页) ---
+# --- 页面 2: 企业深度画像 (第二页，已修改表格为整数显示) ---
 elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
@@ -588,11 +588,17 @@ elif page == "🏢 企业深度画像":
             for _, row in company_data.iterrows():
                 year_row = {
                     '年份': row['year'],
-                    '最终得分': row['最终得分'],
                     '评级': row['评级']
                 }
+                # 1. 收集所有维度得分并强制转成整数（去掉小数位）
+                dim_scores = []
                 for proj in PROJECT_LIST:
-                    year_row[proj] = row[f"项目_{proj}_得分"]
+                    score = int(row[f"项目_{proj}_得分"])
+                    year_row[proj] = score
+                    dim_scores.append(score)
+                
+                # 2. 用维度得分之和，重新计算最终得分并转成整数
+                year_row['最终得分'] = int(sum(dim_scores))
                 full_data.append(year_row)
             
             full_df = pd.DataFrame(full_data).set_index('年份')

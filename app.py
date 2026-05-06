@@ -399,7 +399,8 @@ with st.sidebar:
             excel_path = os.path.join(current_dir, "前端样本3.xlsx")
             
             df = pd.read_excel(excel_path)
-            df['code'] = df['code'].astype(str).str.strip()
+            # 核心修改1：统一股票代码为6位，不足前面补零
+            df['code'] = df['code'].astype(str).str.strip().str.zfill(6)
             df['year'] = df['year'].astype(int)
             for col in ['核心优势', '核心问题', '改进建议']:
                 if col in df.columns:
@@ -544,7 +545,7 @@ if page == "📈 全景统计概览":
                 bottom5.index = bottom5.index + 1
                 st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 2: 企业深度画像 (第二页，已修改表格为整数显示) ---
+# --- 页面 2: 企业深度画像 (第二页，已修改表格为整数显示+6位股票代码) ---
 elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
@@ -562,7 +563,8 @@ elif page == "🏢 企业深度画像":
     
     # 只有点击按钮后才执行查询
     if search_button and input_code:
-        input_code = str(input_code).strip()
+        # 核心修改2：用户输入的代码也统一转为6位补零格式，确保匹配
+        input_code = str(input_code).strip().zfill(6)
         company_data = st.session_state.df[st.session_state.df['code'] == input_code].sort_values('year')
         
         if company_data.empty:
@@ -861,7 +863,7 @@ elif page == "🏢 企业深度画像":
                 st.info("### 📌 改进建议")
                 st.markdown(formatted_suggestion)
 
-# --- 页面 3: 行业对标分析 (第三页) ---
+# --- 页面 3: 行业对标分析 (第三页，已适配6位股票代码) ---
 elif page == "📊 行业对标分析":
     st.title("行业对标分析")
     st.markdown("基于经济绩效与碳披露绩效的四象限分析，直观展示企业在行业中的定位")
@@ -906,7 +908,8 @@ elif page == "📊 行业对标分析":
     
     # 只有点击按钮后才执行分析
     if generate_button and input_code:
-        input_code = str(input_code).strip()
+        # 核心修改3：对标查询的输入代码也统一转为6位补零格式
+        input_code = str(input_code).strip().zfill(6)
         target_df = st.session_state.df[(st.session_state.df['code'] == input_code) & (st.session_state.df['year'] == input_year)]
         
         if target_df.empty:
@@ -1069,7 +1072,7 @@ elif page == "📊 行业对标分析":
                 
                 st.plotly_chart(fig, use_container_width=True)
 
-# --- 页面 4: 智能PDF打分 (第四页) ---
+# --- 页面 4: 智能PDF打分 (第四页，已适配6位股票代码) ---
 elif page == "🤖 智能PDF打分":
     st.title("智能PDF打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分并生成专业分析报告")
@@ -1151,8 +1154,8 @@ elif page == "🤖 智能PDF打分":
                         extra_finance_data=finance_data
                     )
                     
-                    # 安全修复：新打分的code也转成字符串并去空格
-                    result_row['code'] = str(stock_code).strip()
+                    # 核心修改4：PDF打分的股票代码也统一转为6位补零格式
+                    result_row['code'] = str(stock_code).strip().zfill(6)
                     st.session_state.latest_score = result_row
                     st.success("✅ 打分完成！")
             
@@ -1254,7 +1257,7 @@ elif page == "🤖 智能PDF打分":
                     new_code = result['code']
                     new_year = result['year']
                     df = st.session_state.df.copy()
-                    df['code'] = df['code'].astype(str).str.strip()
+                    df['code'] = df['code'].astype(str).str.strip().str.zfill(6)
 
                     original_count = len(df)
                     mask = (df['code'] == new_code) & (df['year'] == new_year)

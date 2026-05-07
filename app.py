@@ -11,6 +11,7 @@ import pdfplumber
 import time
 import requests
 import matplotlib
+import tempfile
 
 # ================= 0. 极简纯净登录界面 =================
 def check_password():
@@ -279,107 +280,97 @@ def format_esg_text(text):
     formatted = "\n".join([f"- {item}" for item in items])
     return formatted
 
-# ================= 3. 打分核心函数 =================
+# ================= 3. 【终极修改版】打分核心函数（完美对接version5） =================
 def simple_score_pdf(pdf_file, api_key, company_name, report_year, 
                      industry_code, extra_finance_data=None):
     """
-    简化版打分接口
+    终极版：完全对接 version5，自带缓存 + 强制算分 + 自动修复 + 兜底不崩
     """
-    # 1. 在内存中解析PDF文本
-    full_text = ""
-    with pdfplumber.open(pdf_file) as pdf:
-        for page in pdf.pages:
-            t = page.extract_text()
-            if t:
-                full_text += t + "\n"
-    
-    # 2. 导入version5的核心类
     from version5 import ESGCarbonScoringSystem
-    
-    # 初始化打分系统
-    scorer = ESGCarbonScoringSystem(
-        api_key=api_key,
-        base_url="https://integrate.api.nvidia.com/v1",
-        model="openai/gpt-oss-120b"
-    )
-    
-    # 3. 调用打分
-    result = scorer.score_esg_report(
-        esg_text=full_text,
-        company_name=company_name,
-        report_year=str(report_year),
-        row_data={},
-        temperature=0.0
-    )
-    
-    if not result:
-        raise Exception("AI模型返回空结果，请检查API密钥或网络连接")
-    
-    # 4. 转换为标准格式
-    scoring_json = result['scoring_result']
-    details = scoring_json.get('scoring_details', {})
-    
-    final_row = {}
-    final_row['code'] = ""
-    final_row['公司名称'] = company_name
-    final_row['year'] = int(report_year)
-    final_row['industrycodec'] = industry_code
-    final_row['报告名称'] = f"{company_name} {report_year}年ESG报告"
-    
-    # 5. 提取10个项目的得分
-    item_dict = {}
-    for dim_data in details.values():
-        for item in dim_data.get('items', []):
-            item_dict[item['name']] = item
-    
-    for proj_name in PROJECT_LIST:
-        if proj_name in item_dict:
-            item = item_dict[proj_name]
-            final_row[f"项目_{proj_name}_得分"] = item['score']
-            final_row[f"项目_{proj_name}_满分"] = item['max_score']
-            final_row[f"项目_{proj_name}_评分理由"] = item['reason']
-            final_row[f"项目_{proj_name}_证据"] = item['evidence']
-        else:
-            final_row[f"项目_{proj_name}_得分"] = 0
-            final_row[f"项目_{proj_name}_满分"] = 2
-            final_row[f"项目_{proj_name}_评分理由"] = "未披露相关内容"
-            final_row[f"项目_{proj_name}_证据"] = ""
-    
-    # 6. 最终得分和评级
-    final_row['最终得分'] = scoring_json.get('final_score', 0)
-    final_row['评级'] = scoring_json.get('score_level', '待改进')
-    
-    # 7. 综合评价
-    summary = scoring_json.get('summary', {})
-    final_row['综合评价'] = summary.get('comprehensive_evaluation', '')
-    
-    # 处理列表转中文分号
-    adv = summary.get('core_advantages', [])
-    if adv == ["无"]:
-        final_row['核心优势'] = "无"
-    else:
-        cleaned_adv = [item.replace(';', '；') for item in adv]
-        final_row['核心优势'] = "；".join(cleaned_adv)
 
-    iss = summary.get('core_issues', [])
-    if iss == ["无"]:
-        final_row['核心问题'] = "无"
-    else:
-        cleaned_iss = [item.replace(';', '；') for item in iss]
-        final_row['核心问题'] = "；".join(cleaned_iss)
+    # 1. 把上传的PDF存成临时文件（让version5的缓存能生效）
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(pdf_file.getvalue())
+        tmp_path = tmp_file.name
 
-    sug = summary.get('improvement_suggestions', [])
-    if sug == ["无"]:
-        final_row['改进建议'] = "无"
-    else:
-        cleaned_sug = [item.replace(';', '；') for item in sug]
-        final_row['改进建议'] = "；".join(cleaned_sug)
-    
-    # 8. 补充财务指标
-    if extra_finance_data:
-        final_row.update(extra_finance_data)
-    
-    return final_row
+    try:
+        # 2. 直接用你写的最强打分系统（所有逻辑全复用）
+        scorer = ESGCarbonScoringSystem(
+            api_key=api_key,
+            base_url="https://integrate.api.nvidia.com/v1",
+            model="openai/gpt-oss-120b"
+        )
+
+        # 3. 调用你原版的打分函数（自带校验、重算、修复、兜底）
+        result = scorer.score_esg_report(
+            esg_source=tmp_path,
+            company_name=company_name,
+            report_year=str(report_year),
+            row_data={},
+            temperature=0.0
+        )
+
+        if not result:
+            raise Exception("AI返回空结果，请检查API密钥或网络连接")
+
+        # 4. 你写的版本已经自动算好分了，直接用！
+        scoring_json = result['scoring_result']
+        details = scoring_json.get('scoring_details', {})
+
+        final_row = {}
+        final_row['code'] = ""
+        final_row['公司名称'] = company_name
+        final_row['year'] = int(report_year)
+        final_row['industrycodec'] = industry_code
+        final_row['报告名称'] = f"{company_name} {report_year}年ESG报告"
+
+        # 5. 提取10个项目（完全不变）
+        item_dict = {}
+        for dim_data in details.values():
+            for item in dim_data.get('items', []):
+                item_dict[item['name']] = item
+
+        for proj_name in PROJECT_LIST:
+            if proj_name in item_dict:
+                item = item_dict[proj_name]
+                final_row[f"项目_{proj_name}_得分"] = item['score']
+                final_row[f"项目_{proj_name}_满分"] = item['max_score']
+                final_row[f"项目_{proj_name}_评分理由"] = item['reason']
+                final_row[f"项目_{proj_name}_证据"] = item['evidence']
+            else:
+                final_row[f"项目_{proj_name}_得分"] = 0
+                final_row[f"项目_{proj_name}_满分"] = 2
+                final_row[f"项目_{proj_name}_评分理由"] = "未披露相关内容"
+                final_row[f"项目_{proj_name}_证据"] = ""
+
+        # 6. 最终得分、评级（已经是你修复后的正确值！）
+        final_row['最终得分'] = scoring_json.get('final_score', 0)
+        final_row['评级'] = scoring_json.get('score_level', '待改进')
+
+        # 7. 综合评价
+        summary = scoring_json.get('summary', {})
+        final_row['综合评价'] = summary.get('comprehensive_evaluation', '')
+
+        # 8. 优势/问题/建议（已经是你修复后的格式）
+        adv = summary.get('core_advantages', [])
+        final_row['核心优势'] = "；".join(adv) if adv != ["无"] else "无"
+
+        iss = summary.get('core_issues', [])
+        final_row['核心问题'] = "；".join(iss) if iss != ["无"] else "无"
+
+        sug = summary.get('improvement_suggestions', [])
+        final_row['改进建议'] = "；".join(sug) if sug != ["无"] else "无"
+
+        # 9. 财务数据
+        if extra_finance_data:
+            final_row.update(extra_finance_data)
+
+        return final_row
+
+    finally:
+        # 清理临时文件
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 # ================= 4. 侧边栏：自动读取本地小样本.xlsx =================
 with st.sidebar:

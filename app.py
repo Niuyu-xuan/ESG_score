@@ -272,8 +272,8 @@ MAIN_COLOR = "#059669"
 # ================= 2. 辅助函数 =================
 def format_esg_text(text):
     """将按分号分隔的长文本自动拆分为标准Markdown无序列表"""
-    if pd.isna(text) or str(text).strip() == "":
-        return "暂无"
+    if pd.isna(text) or str(text).strip() == "" or str(text).strip() == "无":
+        return "- 暂无相关信息"
     
     unified_text = str(text).replace(';', '；')
     items = [item.strip() for item in unified_text.split("；") if item.strip()]
@@ -286,9 +286,6 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     """
     对接 version5.py 的包装函数
     """
-    # 注意：请确保 version5.py 在同一目录下
-    from version5 import ESGCarbonScoringSystem
-
     # 1. 把上传的PDF存成临时文件
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
         tmp_file.write(pdf_file.getvalue())
@@ -296,13 +293,17 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
 
     final_row = {}
     try:
-        # 2. 调用打分系统
+        # 2. 导入version5的核心类
+        from version5 import ESGCarbonScoringSystem
+
+        # 初始化打分系统
         scorer = ESGCarbonScoringSystem(
             api_key=api_key,
             base_url="https://integrate.api.nvidia.com/v1",
             model="openai/gpt-oss-120b"
         )
 
+        # 3. 调用打分系统
         result = scorer.score_esg_report(
             esg_source=tmp_path,
             company_name=company_name,
@@ -314,15 +315,14 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
         if not result:
             raise Exception("AI返回空结果，请检查API密钥或网络")
 
-        # 3. 构建返回给APP的行数据
+        # 4. 构建返回给APP的行数据（直接搬运version5的结果）
         final_row['code'] = ""
-        final_row['公司名称'] = company_name
-        final_row['year'] = int(report_year)
+        final_row['公司名称'] = result.get('company_name', company_name)
+        final_row['year'] = int(result.get('report_year', report_year))
         final_row['industrycodec'] = industry_code
         final_row['报告名称'] = f"{company_name} {report_year}年ESG报告"
 
         # 复制所有项目分数和文字
-        # result 字典里已经由 version5 扁平化好了，我们直接尝试获取
         for proj_name in PROJECT_LIST:
             key_score = f"项目_{proj_name}_得分"
             key_full = f"项目_{proj_name}_满分"
@@ -335,38 +335,18 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
                 final_row[key_reason] = result[key_reason]
                 final_row[key_evidence] = result[key_evidence]
             else:
-                # 兜底：尝试从嵌套结构里挖（防止version5返回格式变动）
-                try:
-                    details = result.get('scoring_result', {}).get('scoring_details', {})
-                    found = False
-                    for dim_data in details.values():
-                        for item in dim_data.get('items', []):
-                            if item.get('name') == proj_name:
-                                final_row[key_score] = item.get('score', 0)
-                                final_row[key_full] = item.get('max_score', 2)
-                                final_row[key_reason] = item.get('reason', '')
-                                final_row[key_evidence] = item.get('evidence', '')
-                                found = True
-                                break
-                        if found: break
-                    if not found:
-                        final_row[key_score] = 0
-                        final_row[key_full] = 2
-                        final_row[key_reason] = "未披露"
-                        final_row[key_evidence] = ""
-                except:
-                    final_row[key_score] = 0
-                    final_row[key_full] = 2
-                    final_row[key_reason] = "未披露"
-                    final_row[key_evidence] = ""
+                final_row[key_score] = 0
+                final_row[key_full] = 2
+                final_row[key_reason] = "未披露"
+                final_row[key_evidence] = ""
 
-        # 复制 summary
+        # 【关键】直接复制 version5 已经修复好的 Summary 字段
         final_row['综合评价'] = result.get('综合评价', '')
         final_row['核心优势'] = result.get('核心优势', '无')
         final_row['核心问题'] = result.get('核心问题', '无')
         final_row['改进建议'] = result.get('改进建议', '无')
         
-        # 先暂时保留AI算的总分，后面APP会覆盖它
+        # 使用 version5 计算好的总分和评级
         final_row['最终得分'] = result.get('total_score', 0)
         final_row['评级'] = result.get('score_level', '待改进')
 
@@ -375,7 +355,10 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
     finally:
         # 清理临时文件
         if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
 
 # ================= 4. 侧边栏：自动读取本地小样本.xlsx =================
 with st.sidebar:
@@ -542,7 +525,7 @@ if page == "📈 全景统计概览":
                 bottom5.index = bottom5.index + 1
                 st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 2: 企业深度画像 (第二页，完全保持原样，未做任何修改！) ---
+# --- 页面 2: 企业深度画像 (第二页，完全保持原样) ---
 elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
@@ -1145,30 +1128,9 @@ elif page == "🤖 智能PDF打分":
         
         st.divider()
         
-        # ==========================================
-        # 【核心】强制重算总分和评级（终极保险）
-        # ==========================================
-        dim_scores = []
-        for proj in PROJECT_LIST:
-            try:
-                score = int(result[f"项目_{proj}_得分"])
-            except:
-                score = 0
-            dim_scores.append(score)
-        
-        # 暴力计算最终得分
-        final_score = int(sum(dim_scores))
-        # 暴力计算评级
-        score_level_map = {(18, 20): "优秀", (16, 17): "良好", (12, 15): "合格", (0, 11): "待改进"}
-        final_level = "待改进"
-        for (lo, hi), label in score_level_map.items():
-            if lo <= final_score <= hi:
-                final_level = label
-                break
-        
-        # 更新结果中的总分和评级（确保合并时是正确的）
-        result['最终得分'] = final_score
-        result['评级'] = final_level
+        # 直接使用 result 里已经算好的分数
+        final_score = int(result.get('最终得分', 0))
+        final_level = result.get('评级', '待改进')
         
         # ==========================================
         # 第一部分：企业概览卡片（和深度画像完全一致）
@@ -1230,10 +1192,10 @@ elif page == "🤖 智能PDF打分":
         
         with col1:
             radar_data = []
-            for i, proj in enumerate(PROJECT_LIST):
-                score = dim_scores[i]
-                full = 2 # 默认满分都是2
-                rate = score / full
+            for proj in PROJECT_LIST:
+                score = int(result.get(f"项目_{proj}_得分", 0))
+                full = int(result.get(f"项目_{proj}_满分", 2))
+                rate = score / full if full > 0 else 0
                 radar_data.append({
                     '项目': proj,
                     '得分率': rate,
@@ -1287,7 +1249,9 @@ elif page == "🤖 智能PDF打分":
             st.write("• 越靠近边缘表示该维度披露越充分")
             st.write("• 越靠近中心表示该维度披露越不足")
             
-            avg_rate = sum(dim_scores) / 20.0
+            # 重新计算平均得分率
+            calc_scores = [int(result.get(f"项目_{proj}_得分", 0)) for proj in PROJECT_LIST]
+            avg_rate = sum(calc_scores) / 20.0
             st.metric("平均得分率", f"{avg_rate:.1%}")
         
         # ==========================================
@@ -1295,10 +1259,10 @@ elif page == "🤖 智能PDF打分":
         # ==========================================
         st.subheader(f"📝 {result['year']}年 详细评分明细")
         
-        for i, proj_name in enumerate(PROJECT_LIST):
-            score_val = dim_scores[i]
-            full_val = 2
-            progress = score_val / full_val
+        for proj_name in PROJECT_LIST:
+            score_val = int(result.get(f"项目_{proj_name}_得分", 0))
+            full_val = int(result.get(f"项目_{proj_name}_满分", 2))
+            progress = score_val / full_val if full_val > 0 else 0
             
             # 尝试获取理由和证据
             reason_key = f"项目_{proj_name}_评分理由"
@@ -1360,8 +1324,6 @@ elif page == "🤖 智能PDF打分":
                     df_final = pd.concat([df, new_row], ignore_index=True)
 
                     st.session_state.df = df_final
-                    # 注意：这里不要 clear cache，否则会重新读旧Excel覆盖
-                    # load_local_excel.clear() 
 
                     st.success("✅ 合并成功！（已自动覆盖旧数据）")
                     st.write(f"• 合并前：{original_count} 条")

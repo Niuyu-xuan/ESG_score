@@ -559,10 +559,7 @@ class ESGCarbonScoringSystem:
                 for item in dim_data.get("items", []):
                     item_dict[item['name']] = item
             
-            # 把10个项目直接拼接到 result 根目录
-            from . import PROJECT_LIST # 尝试导入，如果是独立运行则忽略
-            global PROJECT_LIST
-            # 定义默认的项目列表，防止导入失败
+            # 定义默认的项目列表
             DEFAULT_PROJECTS = [
                 "企业项目或产品符合国际排放标准",
                 "企业项目或产品符合国内排放标准",
@@ -575,10 +572,9 @@ class ESGCarbonScoringSystem:
                 "减排超排奖励或处罚披露",
                 "碳排放量或减排量披露"
             ]
-            
-            proj_list_to_use = PROJECT_LIST if 'PROJECT_LIST' in globals() else DEFAULT_PROJECTS
 
-            for proj_name in proj_list_to_use:
+            # 把10个项目直接拼接到 result 根目录
+            for proj_name in DEFAULT_PROJECTS:
                 if proj_name in item_dict:
                     item = item_dict[proj_name]
                     result[f"项目_{proj_name}_得分"] = item.get('score', 0)
@@ -591,25 +587,82 @@ class ESGCarbonScoringSystem:
                     result[f"项目_{proj_name}_评分理由"] = "未披露相关内容"
                     result[f"项目_{proj_name}_证据"] = ""
 
-            # 处理 summary
+            # ==========================================
+            # 【新增】终极兜底逻辑：自动生成优势/问题/建议
+            # 无论AI返回什么，这里都会根据实际得分重新生成
+            # ==========================================
+            # 第一步：先统计实际得分情况
+            full_score_items = []  # 得2分的项目
+            zero_score_items = []  # 得0分的项目
+            one_score_items = []   # 得1分的项目
+            
+            for proj_name in DEFAULT_PROJECTS:
+                score = result[f"项目_{proj_name}_得分"]
+                if score == 2:
+                    full_score_items.append(proj_name)
+                elif score == 0:
+                    zero_score_items.append(proj_name)
+                elif score == 1:
+                    one_score_items.append(proj_name)
+
+            # 第二步：强制覆盖核心优势
+            if len(full_score_items) > 0:
+                # 有满分项，自动生成优势
+                result["核心优势"] = f"（自动生成）以下项目披露较为充分：{'、'.join(full_score_items)}，均达到了定量披露的要求，为利益相关者提供了可靠的决策依据。"
+            else:
+                # 没有满分项
+                result["核心优势"] = "无"
+
+            # 第三步：强制覆盖核心问题
+            has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
+            if has_issues:
+                problem_list = []
+                if zero_score_items:
+                    problem_list.append(f"以下项目完全未披露：{'、'.join(zero_score_items)}，存在较大的信息不对称风险")
+                if one_score_items:
+                    problem_list.append(f"以下项目仅做了定性描述，缺乏具体的量化数据和实施成效：{'、'.join(one_score_items)}")
+                result["核心问题"] = "；".join(problem_list)
+            else:
+                # 所有项目都是满分
+                result["核心问题"] = "无"
+
+            # 第四步：强制覆盖改进建议
+            if has_issues:
+                suggestions = []
+                if zero_score_items:
+                    suggestions.append("建议补充完全未披露项目的相关信息，至少提供基本的定性描述")
+                if one_score_items:
+                    suggestions.append("建议针对仅定性披露的项目，补充具体的量化数据、年度目标和实际完成情况")
+                result["改进建议"] = "；".join(suggestions)
+            else:
+                result["改进建议"] = "无"
+
+            # 第五步：保留AI生成的综合评价，如果没有就自动生成
             summary = scoring_json.get("summary", {})
-            result["综合评价"] = summary.get("comprehensive_evaluation", "")
-            
-            adv = summary.get("core_advantages", [])
-            result["核心优势"] = "无" if adv == ["无"] else "；".join(adv)
-            
-            iss = summary.get("core_issues", [])
-            result["核心问题"] = "无" if iss == ["无"] else "；".join(iss)
-            
-            sug = summary.get("improvement_suggestions", [])
-            result["改进建议"] = "无" if sug == ["无"] else "；".join(sug)
+            ai_evaluation = summary.get("comprehensive_evaluation", "")
+            if ai_evaluation and len(ai_evaluation) > 50:
+                result["综合评价"] = ai_evaluation
+            else:
+                # 自动生成综合评价
+                total_score = sum(result[f"项目_{proj}_得分"] for proj in DEFAULT_PROJECTS)
+                # 重新计算评级以确保准确
+                final_level = "待改进"
+                for (lo, hi), label in self.score_level_map.items():
+                    if lo <= total_score <= hi:
+                        final_level = label
+                        break
+                result["score_level"] = final_level
+                result["total_score"] = total_score
+                
+                result["综合评价"] = f"该企业{result['report_year']}年碳披露总得分为{total_score}分，评级为{final_level}。企业在{len(full_score_items)}个维度上实现了定量披露，但在{len(zero_score_items)+len(one_score_items)}个维度上仍有提升空间。建议重点关注未披露和仅定性披露的项目，进一步提高碳信息披露的透明度和完整性。"
             
         except Exception as e:
             print(f"  [数据扁平化警告] {e}，但仍返回原始数据")
+            # 极端情况下的终极兜底
+            result["核心优势"] = "无"
+            result["核心问题"] = "无"
+            result["改进建议"] = "无"
+            result["综合评价"] = "暂无综合评价"
 
-        print(f"评分完成！原始AI得分: {result['total_score']}/20，评级: {result['score_level']}")
+        print(f"评分完成！最终处理后得分: {result['total_score']}/20，评级: {result['score_level']}")
         return result
-
-# 注意：为了保持简洁，删除了原代码中的批量导出Excel等非核心函数，
-# 因为APP主要调用的是 score_esg_report 类方法。
-# 如果你需要运行批量脚本，请保留原文件的后半部分。

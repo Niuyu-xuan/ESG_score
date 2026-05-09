@@ -558,20 +558,19 @@ class ESGCarbonScoringSystem:
             "scoring_time":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "report_length":     len(esg_report_text),
             "scoring_result":    scoring_json,
-            "total_score":       scoring_json.get("final_score", 0),
-            "score_level":       scoring_json.get("score_level", "待改进"),
             "original_row_data": row_data if row_data else {}
         }
 
-        # 扁平化数据，方便APP读取
+        # =============================================
+        # 核心修复：扁平化数据 + 强制一致的总分/评级
+        # =============================================
         try:
             details = scoring_json.get("scoring_details", {})
-            item_dict = {}
+            # 将所有维度的 items 按顺序合并成一个列表
+            all_items = []
             for dim_data in details.values():
-                for item in dim_data.get("items", []):
-                    item_dict[item['name']] = item
-            
-            # 定义默认的项目列表
+                all_items.extend(dim_data.get("items", []))
+
             DEFAULT_PROJECTS = [
                 "企业项目或产品符合国际排放标准",
                 "企业项目或产品符合国内排放标准",
@@ -585,96 +584,98 @@ class ESGCarbonScoringSystem:
                 "碳排放量或减排量披露"
             ]
 
-            # 把10个项目直接拼接到 result 根目录
-            for proj_name in DEFAULT_PROJECTS:
-                if proj_name in item_dict:
-                    item = item_dict[proj_name]
-                    result[f"项目_{proj_name}_得分"] = item.get('score', 0)
-                    result[f"项目_{proj_name}_满分"] = item.get('max_score', 2)
-                    result[f"项目_{proj_name}_评分理由"] = item.get('reason', '')
-                    result[f"项目_{proj_name}_证据"] = item.get('evidence', '')
+            project_scores = []   # 用于后续统计分析
+            for idx, proj_name in enumerate(DEFAULT_PROJECTS):
+                if idx < len(all_items):
+                    item = all_items[idx]
+                    score = item.get('score', 0)
+                    max_score = item.get('max_score', 2)
+                    reason = item.get('reason', '')
+                    evidence = item.get('evidence', '')
                 else:
-                    result[f"项目_{proj_name}_得分"] = 0
-                    result[f"项目_{proj_name}_满分"] = 2
-                    result[f"项目_{proj_name}_评分理由"] = "未披露相关内容"
-                    result[f"项目_{proj_name}_证据"] = ""
+                    # AI 返回的 items 数量不够（异常情况），按未披露处理
+                    score = 0
+                    max_score = 2
+                    reason = "未披露相关内容"
+                    evidence = ""
 
-            # ==========================================
-            # 【终极兜底逻辑】自动生成优势/问题/建议
-            # 无论AI返回什么，这里都会根据实际得分重新生成
-            # ==========================================
-            # 第一步：先统计实际得分情况
-            full_score_items = []  # 得2分的项目
-            zero_score_items = []  # 得0分的项目
-            one_score_items = []   # 得1分的项目
-            
-            for proj_name in DEFAULT_PROJECTS:
-                score = result[f"项目_{proj_name}_得分"]
-                if score == 2:
-                    full_score_items.append(proj_name)
-                elif score == 0:
-                    zero_score_items.append(proj_name)
-                elif score == 1:
-                    one_score_items.append(proj_name)
+                result[f"项目_{proj_name}_得分"] = score
+                result[f"项目_{proj_name}_满分"] = max_score
+                result[f"项目_{proj_name}_评分理由"] = reason
+                result[f"项目_{proj_name}_证据"] = evidence
+                project_scores.append(score)
 
-            # 第二步：强制覆盖核心优势
-            if len(full_score_items) > 0:
-                # 有满分项，自动生成优势
+            # 强制重新计算总分（确保与子项得分完全一致）
+            total_score = sum(project_scores)
+            final_level = "待改进"
+            for (lo, hi), label in self.score_level_map.items():
+                if lo <= total_score <= hi:
+                    final_level = label
+                    break
+
+            result["total_score"] = total_score
+            result["score_level"] = final_level
+            # 同步更新 scoring_json，防止其他引用旧值
+            scoring_json["final_score"] = total_score
+            scoring_json["score_level"] = final_level
+
+            # ── 兜底生成核心优势 / 核心问题 / 改进建议 ──
+            full_score_items = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 2]
+            zero_score_items = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 0]
+            one_score_items = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 1]
+
+            # 核心优势
+            if full_score_items:
                 result["核心优势"] = f"（自动生成）以下项目披露较为充分：{'、'.join(full_score_items)}，均达到了定量披露的要求，为利益相关者提供了可靠的决策依据。"
             else:
-                # 没有满分项
                 result["核心优势"] = "无"
 
-            # 第三步：强制覆盖核心问题
+            # 核心问题
             has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
             if has_issues:
-                problem_list = []
+                problem_parts = []
                 if zero_score_items:
-                    problem_list.append(f"以下项目完全未披露：{'、'.join(zero_score_items)}，存在较大的信息不对称风险")
+                    problem_parts.append(f"以下项目完全未披露：{'、'.join(zero_score_items)}，存在较大的信息不对称风险")
                 if one_score_items:
-                    problem_list.append(f"以下项目仅做了定性描述，缺乏具体的量化数据和实施成效：{'、'.join(one_score_items)}")
-                result["核心问题"] = "；".join(problem_list)
+                    problem_parts.append(f"以下项目仅做了定性描述，缺乏具体的量化数据和实施成效：{'、'.join(one_score_items)}")
+                result["核心问题"] = "；".join(problem_parts)
             else:
-                # 所有项目都是满分
                 result["核心问题"] = "无"
 
-            # 第四步：强制覆盖改进建议
+            # 改进建议
             if has_issues:
-                suggestions = []
+                suggestion_parts = []
                 if zero_score_items:
-                    suggestions.append("建议补充完全未披露项目的相关信息，至少提供基本的定性描述")
+                    suggestion_parts.append("建议补充完全未披露项目的相关信息，至少提供基本的定性描述")
                 if one_score_items:
-                    suggestions.append("建议针对仅定性披露的项目，补充具体的量化数据、年度目标和实际完成情况")
-                result["改进建议"] = "；".join(suggestions)
+                    suggestion_parts.append("建议针对仅定性披露的项目，补充具体的量化数据、年度目标和实际完成情况")
+                result["改进建议"] = "；".join(suggestion_parts)
             else:
                 result["改进建议"] = "无"
 
-            # 第五步：保留AI生成的综合评价，如果没有就自动生成
+            # ── 综合评价处理 ──
             summary = scoring_json.get("summary", {})
             ai_evaluation = summary.get("comprehensive_evaluation", "")
+            # 即使AI评价较长，我们也优先展示AI原文（但总分已由程序确定，因此AI原文里若提及其他总分可保留）
             if ai_evaluation and len(ai_evaluation) > 50:
                 result["综合评价"] = ai_evaluation
             else:
                 # 自动生成综合评价
-                total_score = sum(result[f"项目_{proj}_得分"] for proj in DEFAULT_PROJECTS)
-                # 重新计算评级以确保准确
-                final_level = "待改进"
-                for (lo, hi), label in self.score_level_map.items():
-                    if lo <= total_score <= hi:
-                        final_level = label
-                        break
-                result["score_level"] = final_level
-                result["total_score"] = total_score
-                
-                result["综合评价"] = f"该企业{result['report_year']}年碳披露总得分为{total_score}分，评级为{final_level}。企业在{len(full_score_items)}个维度上实现了定量披露，但在{len(zero_score_items)+len(one_score_items)}个维度上仍有提升空间。建议重点关注未披露和仅定性披露的项目，进一步提高碳信息披露的透明度和完整性。"
-            
+                result["综合评价"] = (
+                    f"该企业{result['report_year']}年碳披露总得分为{total_score}分，评级为{final_level}。"
+                    f"企业在{len(full_score_items)}个维度上实现了定量披露，但在{len(zero_score_items)+len(one_score_items)}个维度上仍有提升空间。"
+                    f"建议重点关注未披露和仅定性披露的项目，进一步提高碳信息披露的透明度和完整性。"
+                )
+
         except Exception as e:
             print(f"  [数据扁平化警告] {e}，但仍返回原始数据")
-            # 极端情况下的终极兜底
+            # 极端兜底
+            result["total_score"] = 0
+            result["score_level"] = "待改进"
             result["核心优势"] = "无"
             result["核心问题"] = "无"
             result["改进建议"] = "无"
-            result["综合评价"] = "暂无综合评价"
+            result["综合评价"] = "评分数据处理异常，请重新打分"
 
         print(f"评分完成！最终处理后得分: {result['total_score']}/20，评级: {result['score_level']}")
         return result

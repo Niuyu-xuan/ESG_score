@@ -19,15 +19,14 @@ from datetime import datetime
 import hashlib
 
 # ==========================================
-# 【第一部分：原 version5.py 打分核心代码】
-# 所有打分逻辑都在这里，不再需要单独的 version5.py 文件
+# 【第一部分：打分核心代码】
 # ==========================================
 
 os.environ["NO_PROXY"] = "*"
 os.environ["HTTP_PROXY"] = ""
 os.environ["HTTPS_PROXY"] = ""
 
-# ─── 文本缓存目录（解析后PDF存这里，重跑时直接读，不再重复解析）──────────────
+# ─── 文本缓存目录 ────────────────────────────────────────
 TEXT_CACHE_DIR = "./esg_text_cache"
 
 def sanitize_filename(name: str) -> str:
@@ -43,12 +42,6 @@ def build_local_path(company: str, year: str, pdf_dir: str = "esg_pdfs") -> str:
 def resolve_esg_source(company: str, year: str, url: str,
                        pdf_dir: str = "esg_pdfs",
                        manifest_path: str = "esg_pdfs/manifest.csv") -> str:
-    """
-    返回可用的 ESG 报告路径，优先级：
-    1. manifest.csv 中标记"成功"或"已存在"的本地文件
-    2. 本地 esg_pdfs/{year}_{公司名}.pdf
-    3. 在线 URL（触发后续下载逻辑）
-    """
     if os.path.exists(manifest_path):
         try:
             mdf = pd.read_csv(manifest_path, encoding='utf-8-sig')
@@ -70,16 +63,13 @@ def resolve_esg_source(company: str, year: str, url: str,
     print(f"  [未命中本地] 将实时下载: {url[:60]}...")
     return url
 
-# ─── 优化后的PDF文本缓存：1个PDF ↔ 1个txt，绝不重复生成 ─────────────────
 def _get_cache_path(pdf_path: str) -> str:
-    """根据PDF路径生成唯一的缓存txt路径"""
     os.makedirs(TEXT_CACHE_DIR, exist_ok=True)
     base = os.path.splitext(os.path.basename(pdf_path))[0]
     safe_base = sanitize_filename(base)
     return os.path.join(TEXT_CACHE_DIR, f"{safe_base}.txt")
 
 def _parse_pdf_to_text(pdf_path: str) -> str:
-    """解析PDF为纯文本，不做缓存操作"""
     full_text = ""
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
@@ -89,13 +79,7 @@ def _parse_pdf_to_text(pdf_path: str) -> str:
     return full_text
 
 def load_cached_pdf_text(pdf_path: str) -> Tuple[Optional[str], int]:
-    """
-    加载PDF文本，优先从缓存读取；未命中则解析并写入缓存
-    返回：(文本内容, 缓存文件大小KB)
-    """
     cache_path = _get_cache_path(pdf_path)
-
-    # 命中缓存：直接读取
     if os.path.exists(cache_path):
         try:
             with open(cache_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -105,7 +89,6 @@ def load_cached_pdf_text(pdf_path: str) -> Tuple[Optional[str], int]:
         except Exception as e:
             print(f"  [缓存读取失败] {e}，将重新解析PDF")
 
-    # 未命中缓存：解析PDF并写入缓存
     try:
         text = _parse_pdf_to_text(pdf_path)
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -148,7 +131,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "国际排放标准合规性披露"},
-
                         {"name": "企业项目或产品符合国内排放标准", "code": "china_standard_compliance", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -157,7 +139,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "国内排放标准合规性披露"},
-
                         {"name": "企业节能减排相关描述", "code": "energy_saving_desc", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -166,7 +147,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "节能减排文字与数据披露"},
-
                         {"name": "企业节能减排目标或计划", "code": "energy_saving_target", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -175,7 +155,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "减排目标、规划披露"},
-
                         {"name": "企业参与碳排放交易机制", "code": "carbon_trade_participate", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -184,7 +163,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "碳交易、配额披露"},
-
                         {"name": "节能减排资金投入额披露", "code": "energy_saving_invest", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -193,7 +171,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "低碳投入金额披露"},
-
                         {"name": "节能减排财务绩效披露", "code": "energy_saving_finance_performance", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -202,7 +179,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "减排效益、财务回报"},
-
                         {"name": "节能减排项目或技术数量", "code": "energy_saving_project_num", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -211,7 +187,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "项目数量、技术种类"},
-
                         {"name": "减排/超排奖励或处罚披露", "code": "carbon_reward_punish", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -220,7 +195,6 @@ class ESGCarbonScoringSystem:
                          ],
                          "basis": "碳排放利益相关者披露要求",
                          "verification_points": "环保奖惩、行政处罚"},
-
                         {"name": "碳排放量或减排量披露", "code": "carbon_emission_reduction_data", "max_score": 2,
                          "rules": [
                              {"score": 0, "description": "无描述", "keywords": []},
@@ -271,17 +245,29 @@ class ESGCarbonScoringSystem:
                         prompt += f"**评分依据**：{item['basis']}\n"
                         prompt += f"**验证要点**：{item['verification_points']}\n\n"
 
+        # ── 强化版 summary 规则 ─────────────────────────────────
         prompt += (
-            '\n【summary字段填写规则（重要）】\n'
-            '1. comprehensive_evaluation：不少于200字，必须包含「整体评级+最终得分+3个核心亮点+2-3个核心短板+行业定位参考」\n'
+            '\n【summary字段填写规则（强制执行）】\n'
+            '1. comprehensive_evaluation：不少于250字，必须包含「整体评价+最终得分及评级+3个具体亮点（带数据引用）+2~3个具体短板（带缺失描述）+行业定位对比」。\n'
+            '   禁止使用“该企业表现较好”这种空话，必须指出：哪个项目得了满分、引用了报告的哪一页哪个数据、对投资者/监管机构有何价值。\n'
             '2. core_advantages 填写规则：\n'
-            '   - 【有得分为2分的项目时】：列出所有得分为2分（满分）的项目，每条不少于80字，说明披露了什么具体数据、数据颗粒度、对利益相关者的价值\n'
-            '   - 【没有任何项目得分为2分时】：输出 ["无"] （一个元素的列表，内容为"无"这个字）\n'
+            '   - 必须列出**所有得分为2分（满分）**的项目，**一个都不能少**。\n'
+            '   - 每个条目不少于100字，采用以下固定模板：\n'
+            '     “【项目名称】：披露了×××(具体引用报告中的数字/描述，例如“报告第12页明确披露2024年碳排放总量为500万吨”)。数据颗粒度达到×××（如行业分类/设施级），为利益相关者提供了可核实的决策依据，体现了企业碳管理的透明度。”\n'
+            '   - 如果**没有任何项目得分为2分**，则必须输出 **["无"]** （一个元素，内容为汉字“无”）。\n'
+            '   - 绝对禁止输出空列表[]或只写“无”字而不带方括号。\n'
             '3. core_issues 填写规则：\n'
-            '   - 【有得分为0分或1分的项目时】：优先列出得分为0分的项目，再补充得分为1分的可优化点，每条不少于60字，说明未披露导致的风险\n'
-            '   - 【所有项目均得2分（满分20分）时】：输出 ["无"] （一个元素的列表，内容为"无"这个字）\n'
-            '4. improvement_suggestions：必须针对core_issues中的每一个问题提出对应建议（若core_issues为["无"]则improvement_suggestions也输出["无"]），每条不少于50字\n'
-            '5. 禁止使用空泛套话，所有内容必须基于本次评分结果\n\n'
+            '   - 必须列出**所有得分为0分**的项目，再列出**得分为1分**的项目（优先级：0分在前）。\n'
+            '   - 每条不少于80字，模板：\n'
+            '     “【项目名称】：当前披露状态（完全未披露/仅有定性描述），具体缺失内容为×××。这可能导致投资者无法评估企业的×××风险，与行业最佳实践（如GRI 305）差距明显。”\n'
+            '   - 如果**所有项目都得2分**，则必须输出 **["无"]**。\n'
+            '4. improvement_suggestions：必须针对core_issues中的每一个问题，一一对应提出建议，每条不少于60字。\n'
+            '   如果core_issues为["无"]，则此处也必须输出 **["无"]**。\n'
+            '5. 严禁使用“加强披露”“提高重视”等万能套话，必须具体到：应披露什么指标、采用什么标准、建议参考哪份框架。\n'
+            '6. 所有文字必须基于本次评分结果，不得杜撰报告中没有的数据。\n\n'
+        )
+
+        prompt += (
             '【输出格式强制要求】\n'
             '【评级标准（严格执行）】\n'
             '- 18-20分：优秀\n'
@@ -312,10 +298,17 @@ class ESGCarbonScoringSystem:
             '  "final_score": 20,\n'
             '  "score_level": "优秀",\n'
             '  "summary": {\n'
-            '    "comprehensive_evaluation": "综合评价正文（不少于200字）...",\n'
-            '    "core_advantages": ["优势条目1（不少于80字）", "优势条目2"] 或 ["无"],\n'
-            '    "core_issues": ["问题条目1（不少于60字）", "问题条目2"] 或 ["无"],\n'
-            '    "improvement_suggestions": ["建议条目1（不少于50字）", "建议条目2"] 或 ["无"]\n'
+            '    "comprehensive_evaluation": "该企业2024年碳披露总分为14分，评级为合格。亮点包括……（此处展示完整规范文本，不少于250字）",\n'
+            '    "core_advantages": [\n'
+            '      "【碳排放量或减排量披露】：报告第18页详细披露了2024年Scope1排放52万吨、Scope2排放18万吨，并附有第三方核查声明，数据颗粒度达到设施级，为投资者提供了清晰的风险敞口视图。",\n'
+            '      "【企业节能减排相关描述】：……"\n'
+            '    ],\n'
+            '    "core_issues": [\n'
+            '      "【企业参与碳排放交易机制】：报告中完全未提及碳交易相关参与情况。这导致无法判断企业是否面临碳配额成本上升的风险，与TCFD建议的信息披露要求存在较大差距。"\n'
+            '    ],\n'
+            '    "improvement_suggestions": [\n'
+            '      "建议在下一期报告中披露企业参与的碳排放交易类型、配额数量、履约情况，可参照CDP问卷C6.1项进行说明。"\n'
+            '    ]\n'
             '  }\n'
             '}\n'
             '```\n\n'
@@ -463,7 +456,7 @@ class ESGCarbonScoringSystem:
         print(f"开始评分: {report_year}年 {company_name}")
         print(f"{'='*70}")
 
-        # ── 加载文本 ──────────────────────────────────────────────────────────
+        # ── 加载文本 ─────────────────────────────
         if esg_text:
             esg_report_text = esg_text
             print("  [使用已解析文本] 跳过重复加载")
@@ -566,7 +559,6 @@ class ESGCarbonScoringSystem:
         # =============================================
         try:
             details = scoring_json.get("scoring_details", {})
-            # 将所有维度的 items 按顺序合并成一个列表
             all_items = []
             for dim_data in details.values():
                 all_items.extend(dim_data.get("items", []))
@@ -584,7 +576,7 @@ class ESGCarbonScoringSystem:
                 "碳排放量或减排量披露"
             ]
 
-            project_scores = []   # 用于后续统计分析
+            project_scores = []
             for idx, proj_name in enumerate(DEFAULT_PROJECTS):
                 if idx < len(all_items):
                     item = all_items[idx]
@@ -593,7 +585,6 @@ class ESGCarbonScoringSystem:
                     reason = item.get('reason', '')
                     evidence = item.get('evidence', '')
                 else:
-                    # AI 返回的 items 数量不够（异常情况），按未披露处理
                     score = 0
                     max_score = 2
                     reason = "未披露相关内容"
@@ -605,7 +596,7 @@ class ESGCarbonScoringSystem:
                 result[f"项目_{proj_name}_证据"] = evidence
                 project_scores.append(score)
 
-            # 强制重新计算总分（确保与子项得分完全一致）
+            # 强制重新计算总分
             total_score = sum(project_scores)
             final_level = "待改进"
             for (lo, hi), label in self.score_level_map.items():
@@ -615,52 +606,96 @@ class ESGCarbonScoringSystem:
 
             result["total_score"] = total_score
             result["score_level"] = final_level
-            # 同步更新 scoring_json，防止其他引用旧值
             scoring_json["final_score"] = total_score
             scoring_json["score_level"] = final_level
 
-            # ── 兜底生成核心优势 / 核心问题 / 改进建议 ──
+            # ── 统计得分分布 ─────────────────────────
             full_score_items = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 2]
             zero_score_items = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 0]
-            one_score_items = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 1]
+            one_score_items  = [name for name, s in zip(DEFAULT_PROJECTS, project_scores) if s == 1]
 
-            # 核心优势
-            if full_score_items:
-                result["核心优势"] = f"（自动生成）以下项目披露较为充分：{'、'.join(full_score_items)}，均达到了定量披露的要求，为利益相关者提供了可靠的决策依据。"
+            # ── 智能验证 AI 的 summary 输出 ──────────
+            ai_summary = scoring_json.get("summary", {})
+
+            def is_valid_advantage_list(lst):
+                if not isinstance(lst, list) or len(lst) == 0:
+                    return False
+                if lst == ["无"]:
+                    return True
+                return all(isinstance(s, str) and len(s.strip()) > 60 for s in lst)
+
+            def is_valid_issue_list(lst):
+                if not isinstance(lst, list) or len(lst) == 0:
+                    return False
+                if lst == ["无"]:
+                    return True
+                return all(isinstance(s, str) and len(s.strip()) > 50 for s in lst)
+
+            # 核心优势验证与兜底
+            ai_adv = ai_summary.get("core_advantages", [])
+            if is_valid_advantage_list(ai_adv):
+                if ai_adv == ["无"]:
+                    result["核心优势"] = "无"
+                else:
+                    result["核心优势"] = "；".join(ai_adv)
             else:
-                result["核心优势"] = "无"
+                if full_score_items:
+                    result["核心优势"] = f"（自动生成）以下项目披露较为充分：{'、'.join(full_score_items)}，均达到了定量披露的要求。"
+                else:
+                    result["核心优势"] = "无"
 
-            # 核心问题
-            has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
-            if has_issues:
-                problem_parts = []
-                if zero_score_items:
-                    problem_parts.append(f"以下项目完全未披露：{'、'.join(zero_score_items)}，存在较大的信息不对称风险")
-                if one_score_items:
-                    problem_parts.append(f"以下项目仅做了定性描述，缺乏具体的量化数据和实施成效：{'、'.join(one_score_items)}")
-                result["核心问题"] = "；".join(problem_parts)
+            # 核心问题验证与兜底
+            ai_issues = ai_summary.get("core_issues", [])
+            if is_valid_issue_list(ai_issues):
+                if ai_issues == ["无"]:
+                    result["核心问题"] = "无"
+                else:
+                    result["核心问题"] = "；".join(ai_issues)
             else:
-                result["核心问题"] = "无"
+                has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
+                if has_issues:
+                    problem_parts = []
+                    if zero_score_items:
+                        problem_parts.append(f"以下项目完全未披露：{'、'.join(zero_score_items)}，存在较大的信息不对称风险")
+                    if one_score_items:
+                        problem_parts.append(f"以下项目仅做了定性描述，缺乏具体的量化数据和实施成效：{'、'.join(one_score_items)}")
+                    result["核心问题"] = "；".join(problem_parts)
+                else:
+                    result["核心问题"] = "无"
 
-            # 改进建议
-            if has_issues:
-                suggestion_parts = []
-                if zero_score_items:
-                    suggestion_parts.append("建议补充完全未披露项目的相关信息，至少提供基本的定性描述")
-                if one_score_items:
-                    suggestion_parts.append("建议针对仅定性披露的项目，补充具体的量化数据、年度目标和实际完成情况")
-                result["改进建议"] = "；".join(suggestion_parts)
+            # 改进建议验证与兜底
+            ai_suggestions = ai_summary.get("improvement_suggestions", [])
+            if isinstance(ai_suggestions, list) and len(ai_suggestions) > 0 and ai_suggestions != ["无"]:
+                if all(len(s.strip()) > 30 for s in ai_suggestions):
+                    result["改进建议"] = "；".join(ai_suggestions)
+                else:
+                    has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
+                    if has_issues:
+                        suggestion_parts = []
+                        if zero_score_items:
+                            suggestion_parts.append("建议补充完全未披露项目的相关信息，至少提供基本的定性描述")
+                        if one_score_items:
+                            suggestion_parts.append("建议针对仅定性披露的项目，补充具体的量化数据、年度目标和实际完成情况")
+                        result["改进建议"] = "；".join(suggestion_parts)
+                    else:
+                        result["改进建议"] = "无"
             else:
-                result["改进建议"] = "无"
+                has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
+                if has_issues:
+                    suggestion_parts = []
+                    if zero_score_items:
+                        suggestion_parts.append("建议补充完全未披露项目的相关信息，至少提供基本的定性描述")
+                    if one_score_items:
+                        suggestion_parts.append("建议针对仅定性披露的项目，补充具体的量化数据、年度目标和实际完成情况")
+                    result["改进建议"] = "；".join(suggestion_parts)
+                else:
+                    result["改进建议"] = "无"
 
-            # ── 综合评价处理 ──
-            summary = scoring_json.get("summary", {})
-            ai_evaluation = summary.get("comprehensive_evaluation", "")
-            # 即使AI评价较长，我们也优先展示AI原文（但总分已由程序确定，因此AI原文里若提及其他总分可保留）
-            if ai_evaluation and len(ai_evaluation) > 50:
+            # ── 综合评价处理 ─────────────────────────
+            ai_evaluation = ai_summary.get("comprehensive_evaluation", "")
+            if ai_evaluation and len(ai_evaluation) > 100:
                 result["综合评价"] = ai_evaluation
             else:
-                # 自动生成综合评价
                 result["综合评价"] = (
                     f"该企业{result['report_year']}年碳披露总得分为{total_score}分，评级为{final_level}。"
                     f"企业在{len(full_score_items)}个维度上实现了定量披露，但在{len(zero_score_items)+len(one_score_items)}个维度上仍有提升空间。"
@@ -669,7 +704,6 @@ class ESGCarbonScoringSystem:
 
         except Exception as e:
             print(f"  [数据扁平化警告] {e}，但仍返回原始数据")
-            # 极端兜底
             result["total_score"] = 0
             result["score_level"] = "待改进"
             result["核心优势"] = "无"
@@ -679,7 +713,6 @@ class ESGCarbonScoringSystem:
 
         print(f"评分完成！最终处理后得分: {result['total_score']}/20，评级: {result['score_level']}")
         return result
-
 # ==========================================
 # 【第二部分：原 APP 界面代码】
 # 所有界面逻辑都在这里

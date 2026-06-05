@@ -245,7 +245,7 @@ class ESGCarbonScoringSystem:
                         prompt += f"**评分依据**：{item['basis']}\n"
                         prompt += f"**验证要点**：{item['verification_points']}\n\n"
 
-        # ── 强化版 summary 规则 ─────────────────────────────────
+        # ── 强化版 summary 规则（已去除模板中的【】） ──
         prompt += (
             '\n【summary字段填写规则（强制执行）】\n'
             '1. comprehensive_evaluation：不少于250字，必须包含「整体评价+最终得分及评级+3个具体亮点（带数据引用）+2~3个具体短板（带缺失描述）+行业定位对比」。\n'
@@ -253,13 +253,13 @@ class ESGCarbonScoringSystem:
             '2. core_advantages 填写规则：\n'
             '   - 必须列出**所有得分为2分（满分）**的项目，**一个都不能少**。\n'
             '   - 每个条目不少于100字，采用以下固定模板：\n'
-            '     “【项目名称】：披露了×××(具体引用报告中的数字/描述，例如“报告第12页明确披露2024年碳排放总量为500万吨”)。数据颗粒度达到×××（如行业分类/设施级），为利益相关者提供了可核实的决策依据，体现了企业碳管理的透明度。”\n'
+            '     “项目名称：披露了×××(具体引用报告中的数字/描述，例如“报告第12页明确披露2024年碳排放总量为500万吨”)。数据颗粒度达到×××（如行业分类/设施级），为利益相关者提供了可核实的决策依据，体现了企业碳管理的透明度。”\n'
             '   - 如果**没有任何项目得分为2分**，则必须输出 **["无"]** （一个元素，内容为汉字“无”）。\n'
             '   - 绝对禁止输出空列表[]或只写“无”字而不带方括号。\n'
             '3. core_issues 填写规则：\n'
             '   - 必须列出**所有得分为0分**的项目，再列出**得分为1分**的项目（优先级：0分在前）。\n'
             '   - 每条不少于80字，模板：\n'
-            '     “【项目名称】：当前披露状态（完全未披露/仅有定性描述），具体缺失内容为×××。这可能导致投资者无法评估企业的×××风险，与行业最佳实践（如GRI 305）差距明显。”\n'
+            '     “项目名称：当前披露状态（完全未披露/仅有定性描述），具体缺失内容为×××。这可能导致投资者无法评估企业的×××风险，与行业最佳实践（如GRI 305）差距明显。”\n'
             '   - 如果**所有项目都得2分**，则必须输出 **["无"]**。\n'
             '4. improvement_suggestions：必须针对core_issues中的每一个问题，一一对应提出建议，每条不少于60字。\n'
             '   如果core_issues为["无"]，则此处也必须输出 **["无"]**。\n'
@@ -300,11 +300,11 @@ class ESGCarbonScoringSystem:
             '  "summary": {\n'
             '    "comprehensive_evaluation": "该企业2024年碳披露总分为14分，评级为合格。亮点包括……（此处展示完整规范文本，不少于250字）",\n'
             '    "core_advantages": [\n'
-            '      "【碳排放量或减排量披露】：报告第18页详细披露了2024年Scope1排放52万吨、Scope2排放18万吨，并附有第三方核查声明，数据颗粒度达到设施级，为投资者提供了清晰的风险敞口视图。",\n'
-            '      "【企业节能减排相关描述】：……"\n'
+            '      "碳排放量或减排量披露：报告第18页详细披露了2024年Scope1排放52万吨、Scope2排放18万吨，并附有第三方核查声明，数据颗粒度达到设施级，为投资者提供了清晰的风险敞口视图。",\n'
+            '      "企业节能减排相关描述：……"\n'
             '    ],\n'
             '    "core_issues": [\n'
-            '      "【企业参与碳排放交易机制】：报告中完全未提及碳交易相关参与情况。这导致无法判断企业是否面临碳配额成本上升的风险，与TCFD建议的信息披露要求存在较大差距。"\n'
+            '      "企业参与碳排放交易机制：报告中完全未提及碳交易相关参与情况。这导致无法判断企业是否面临碳配额成本上升的风险，与TCFD建议的信息披露要求存在较大差距。"\n'
             '    ],\n'
             '    "improvement_suggestions": [\n'
             '      "建议在下一期报告中披露企业参与的碳排放交易类型、配额数量、履约情况，可参照CDP问卷C6.1项进行说明。"\n'
@@ -637,7 +637,9 @@ class ESGCarbonScoringSystem:
                 if ai_adv == ["无"]:
                     result["核心优势"] = "无"
                 else:
-                    result["核心优势"] = "；".join(ai_adv)
+                    # 去除AI可能残留的【】
+                    cleaned_adv = [item.replace("【", "").replace("】", "") for item in ai_adv]
+                    result["核心优势"] = "；".join(cleaned_adv)
             else:
                 if full_score_items:
                     result["核心优势"] = f"（自动生成）以下项目披露较为充分：{'、'.join(full_score_items)}，均达到了定量披露的要求。"
@@ -650,7 +652,9 @@ class ESGCarbonScoringSystem:
                 if ai_issues == ["无"]:
                     result["核心问题"] = "无"
                 else:
-                    result["核心问题"] = "；".join(ai_issues)
+                    # 去除AI可能残留的【】
+                    cleaned_issues = [item.replace("【", "").replace("】", "") for item in ai_issues]
+                    result["核心问题"] = "；".join(cleaned_issues)
             else:
                 has_issues = len(zero_score_items) > 0 or len(one_score_items) > 0
                 if has_issues:
@@ -1051,6 +1055,11 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
         # 使用计算好的总分和评级
         final_row['最终得分'] = result.get('total_score', 0)
         final_row['评级'] = result.get('score_level', '待改进')
+
+        # 彻底清除可能残留的【】 (双重保险)
+        final_row['核心优势'] = final_row['核心优势'].replace("【", "").replace("】", "")
+        final_row['核心问题'] = final_row['核心问题'].replace("【", "").replace("】", "")
+        final_row['改进建议'] = final_row['改进建议'].replace("【", "").replace("】", "")
 
         return final_row
 

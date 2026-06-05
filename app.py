@@ -245,31 +245,26 @@ class ESGCarbonScoringSystem:
                         prompt += f"**评分依据**：{item['basis']}\n"
                         prompt += f"**验证要点**：{item['verification_points']}\n\n"
 
-        # ── 强化版 summary 规则（已按用户要求修改输出结构，并去除【】符号）────────────────────────────────
+        # ── 强化版 summary 规则 ─────────────────────────────────
         prompt += (
             '\n【summary字段填写规则（强制执行）】\n'
             '1. comprehensive_evaluation：不少于250字，必须包含「整体评价+最终得分及评级+3个具体亮点（带数据引用）+2~3个具体短板（带缺失描述）+行业定位对比」。\n'
-            '   禁止使用"该企业表现较好"这种空话，必须指出：哪个项目得了满分、引用了报告的哪一页哪个数据、对投资者/监管机构有何价值。\n'
-            '2. core_advantages 填写规则（国内排放标准合规示例）：\n'
+            '   禁止使用“该企业表现较好”这种空话，必须指出：哪个项目得了满分、引用了报告的哪一页哪个数据、对投资者/监管机构有何价值。\n'
+            '2. core_advantages 填写规则：\n'
             '   - 必须列出**所有得分为2分（满分）**的项目，**一个都不能少**。\n'
-            '   - 每个条目采用以下固定结构（禁止使用【】符号）：\n'
-            '     "项目名称方面，[具体披露内容]。报告明确指出[具体标准编号/认证信息]，提供了[具体的定量数据/认证细节]，说明[合规实现方式]，这对[利益相关方]的[具体价值]具有重要价值。"\n'
-            '   - 国内排放标准示例：企业项目或产品符合国内排放标准方面，报告明确指出产品碳足迹证书符合GB/T 24067-2024《温室气体产品碳足迹量化要求和指南》以及T/CBMF 277-2024，提供了具体的标准编号和认证信息，说明公司产品在国内排放要求上已实现可核查的定量合规，这对客户和监管机构的信任具有重要价值。\n'
-            '   - 如果**没有任何项目得分为2分**，则必须输出 **["无"]** （一个元素，内容为汉字"无"）。\n'
-            '   - 绝对禁止输出空列表[]或只写"无"字而不带方括号。\n'
-            '3. core_issues 填写规则（国际排放标准合规示例）：\n'
+            '   - 每个条目不少于100字，采用以下固定模板：\n'
+            '     “【项目名称】：披露了×××(具体引用报告中的数字/描述，例如“报告第12页明确披露2024年碳排放总量为500万吨”)。数据颗粒度达到×××（如行业分类/设施级），为利益相关者提供了可核实的决策依据，体现了企业碳管理的透明度。”\n'
+            '   - 如果**没有任何项目得分为2分**，则必须输出 **["无"]** （一个元素，内容为汉字“无”）。\n'
+            '   - 绝对禁止输出空列表[]或只写“无”字而不带方括号。\n'
+            '3. core_issues 填写规则：\n'
             '   - 必须列出**所有得分为0分**的项目，再列出**得分为1分**的项目（优先级：0分在前）。\n'
-            '   - 每条采用以下结构（禁止使用【】符号）：\n'
-            '     "项目名称方面，[当前披露状态/缺失内容]。这可能导致[具体风险/后果]，增加[利益相关方]的[具体问题]。"\n'
-            '   - 国际排放标准示例：企业项目或产品符合国际排放标准方面，报告仅提及ISO 50001能源管理体系认证，缺乏对国际排放标准（如ISO 14064、EN标准）的定量合规数据，可能导致国际投资者和跨境合作伙伴对公司碳合规水平的认知不完整，增加信息不对称风险。\n'
+            '   - 每条不少于80字，模板：\n'
+            '     “【项目名称】：当前披露状态（完全未披露/仅有定性描述），具体缺失内容为×××。这可能导致投资者无法评估企业的×××风险，与行业最佳实践（如GRI 305）差距明显。”\n'
             '   - 如果**所有项目都得2分**，则必须输出 **["无"]**。\n'
-            '4. improvement_suggestions：必须针对core_issues中的每一个问题，一一对应提出建议，每条采用以下结构（禁止使用【】符号）：\n'
-            '   - 结构："建议公司在后续报告中[具体行动]，提供[具体标准/数据要求]，以[预期效果/价值]。\n'
-            '   - 示例：建议公司在后续报告中补充对国际排放标准的合规情况，提供ISO 14064、ISO 14001或其他国际认可的温室气体核算与报告标准的认证证书编号、核查范围及对应的排放量数据，以实现与国际最佳实践的对标，提升跨境投资者和合作伙伴的信任度。\n'
+            '4. improvement_suggestions：必须针对core_issues中的每一个问题，一一对应提出建议，每条不少于60字。\n'
             '   如果core_issues为["无"]，则此处也必须输出 **["无"]**。\n'
-            '5. 严禁使用"加强披露""提高重视"等万能套话，必须具体到：应披露什么指标、采用什么标准、建议参考哪份框架。\n'
-            '6. 所有文字必须基于本次评分结果，不得杜撰报告中没有的数据。\n'
-            '7. **绝对禁止在输出的任何位置使用中文方括号【】，包括但不限于项目名称前缀。请直接使用纯文本描述项目名称。**\n\n'
+            '5. 严禁使用“加强披露”“提高重视”等万能套话，必须具体到：应披露什么指标、采用什么标准、建议参考哪份框架。\n'
+            '6. 所有文字必须基于本次评分结果，不得杜撰报告中没有的数据。\n\n'
         )
 
         prompt += (
@@ -305,14 +300,14 @@ class ESGCarbonScoringSystem:
             '  "summary": {\n'
             '    "comprehensive_evaluation": "该企业2024年碳披露总分为14分，评级为合格。亮点包括……（此处展示完整规范文本，不少于250字）",\n'
             '    "core_advantages": [\n'
-            '      "企业项目或产品符合国内排放标准方面，报告明确指出产品碳足迹证书符合GB/T 24067-2024《温室气体产品碳足迹量化要求和指南》以及T/CBMF 277-2024，提供了具体的标准编号和认证信息，说明公司产品在国内排放要求上已实现可核查的定量合规，这对客户和监管机构的信任具有重要价值。",\n'
-            '      "企业节能减排相关描述方面……"\n'
+            '      "【碳排放量或减排量披露】：报告第18页详细披露了2024年Scope1排放52万吨、Scope2排放18万吨，并附有第三方核查声明，数据颗粒度达到设施级，为投资者提供了清晰的风险敞口视图。",\n'
+            '      "【企业节能减排相关描述】：……"\n'
             '    ],\n'
             '    "core_issues": [\n'
-            '      "企业项目或产品符合国际排放标准方面，报告仅提及ISO 50001能源管理体系认证，缺乏对国际排放标准（如ISO 14064、EN标准）的定量合规数据，可能导致国际投资者和跨境合作伙伴对公司碳合规水平的认知不完整，增加信息不对称风险。"\n'
+            '      "【企业参与碳排放交易机制】：报告中完全未提及碳交易相关参与情况。这导致无法判断企业是否面临碳配额成本上升的风险，与TCFD建议的信息披露要求存在较大差距。"\n'
             '    ],\n'
             '    "improvement_suggestions": [\n'
-            '      "建议公司在后续报告中补充对国际排放标准的合规情况，提供ISO 14064、ISO 14001或其他国际认可的温室气体核算与报告标准的认证证书编号、核查范围及对应的排放量数据，以实现与国际最佳实践的对标，提升跨境投资者和合作伙伴的信任度。"\n'
+            '      "建议在下一期报告中披露企业参与的碳排放交易类型、配额数量、履约情况，可参照CDP问卷C6.1项进行说明。"\n'
             '    ]\n'
             '  }\n'
             '}\n'
@@ -322,7 +317,6 @@ class ESGCarbonScoringSystem:
             '2. 每个得分都有明确的reason和evidence，evidence必须标注报告页码或章节\n'
             '3. score_level必须为：优秀/良好/合格/待改进\n'
             '4. core_advantages、core_issues、improvement_suggestions严格遵守上述填写规则\n'
-            '5. 核查确认输出中不包含任何【】符号\n'
         )
         return prompt
 
@@ -586,8 +580,8 @@ class ESGCarbonScoringSystem:
             for idx, proj_name in enumerate(DEFAULT_PROJECTS):
                 if idx < len(all_items):
                     item = all_items[idx]
-                    score = int(item.get('score', 0))  # 强制转换为整数
-                    max_score = int(item.get('max_score', 2))  # 强制转换为整数
+                    score = item.get('score', 0)
+                    max_score = item.get('max_score', 2)
                     reason = item.get('reason', '')
                     evidence = item.get('evidence', '')
                 else:
@@ -1030,7 +1024,7 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
         final_row['industrycodec'] = industry_code
         final_row['报告名称'] = f"{company_name} {report_year}年ESG报告"
 
-        # 复制所有项目分数和文字（强制整型）
+        # 复制所有项目分数和文字
         for proj_name in PROJECT_LIST:
             key_score = f"项目_{proj_name}_得分"
             key_full = f"项目_{proj_name}_满分"
@@ -1038,8 +1032,8 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
             key_evidence = f"项目_{proj_name}_证据"
             
             if key_score in result:
-                final_row[key_score] = int(result[key_score])  # 强制转为整数
-                final_row[key_full] = int(result[key_full])    # 强制转为整数
+                final_row[key_score] = result[key_score]
+                final_row[key_full] = result[key_full]
                 final_row[key_reason] = result[key_reason]
                 final_row[key_evidence] = result[key_evidence]
             else:
@@ -1055,7 +1049,7 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
         final_row['改进建议'] = result.get('改进建议', '无')
         
         # 使用计算好的总分和评级
-        final_row['最终得分'] = int(result.get('total_score', 0))
+        final_row['最终得分'] = result.get('total_score', 0)
         final_row['评级'] = result.get('score_level', '待改进')
 
         return final_row
@@ -1089,21 +1083,9 @@ with st.sidebar:
             # 核心修改1：统一股票代码为6位，不足前面补零
             df['code'] = df['code'].astype(str).str.strip().str.zfill(6)
             df['year'] = df['year'].astype(int)
-            # 强制将所有项目得分列转为整数，防止出现小数
-            for proj in PROJECT_LIST:
-                score_col = f"项目_{proj}_得分"
-                full_col = f"项目_{proj}_满分"
-                if score_col in df.columns:
-                    df[score_col] = df[score_col].astype(int)
-                if full_col in df.columns:
-                    df[full_col] = df[full_col].astype(int)
-            # 最终得分也转整数
-            if '最终得分' in df.columns:
-                df['最终得分'] = df['最终得分'].astype(int)
-                
             for col in ['核心优势', '核心问题', '改进建议']:
                 if col in df.columns:
-                    df[col] = df[col].astype(str).str.replace(';', '；').str.replace('【', '').str.replace('】', '')
+                    df[col] = df[col].astype(str).str.replace(';', '；')
             return df
         except Exception as e:
             st.error(f"文件加载失败：{str(e)}")
@@ -1245,7 +1227,7 @@ if page == "📈 全景统计概览":
                 bottom5.index = bottom5.index + 1
                 st.dataframe(bottom5, use_container_width=True)
 
-# --- 页面 2: 企业深度画像 (第二页，重点修改分数显示为整数) ---
+# --- 页面 2: 企业深度画像 (第二页，完全保持原样) ---
 elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
@@ -1292,14 +1274,14 @@ elif page == "🏢 企业深度画像":
                     '年份': row['year'],
                     '评级': row['评级']
                 }
-                # 1. 收集所有维度得分并强制转成整数（关键修改）
+                # 1. 收集所有维度得分并强制转成整数（去掉小数位）
                 dim_scores = []
                 for proj in PROJECT_LIST:
                     score = int(row[f"项目_{proj}_得分"])
                     year_row[proj] = score
                     dim_scores.append(score)
                 
-                # 2. 用维度得分之和，重新计算最终得分并转成整数（关键修改）
+                # 2. 用维度得分之和，重新计算最终得分并转成整数
                 year_row['最终得分'] = int(sum(dim_scores))
                 full_data.append(year_row)
             
@@ -1364,7 +1346,7 @@ elif page == "🏢 企业深度画像":
                 plot_data = []
                 for _, row in company_data.iterrows():
                     for dim in selected_dimensions:
-                        score = int(row['最终得分']) if dim == '最终得分' else int(row[f"项目_{dim}_得分"])
+                        score = row['最终得分'] if dim == '最终得分' else row[f"项目_{dim}_得分"]
                         plot_data.append({
                             '年份': row['year'],
                             '维度': dim,
@@ -1435,7 +1417,7 @@ elif page == "🏢 企业深度画像":
                 st.markdown(f"""
                 <div class="metric-card">
                     <h3 style="margin-top:0; color:#065F46;">最终得分</h3>
-                    <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{int(year_data['最终得分'])}</p>
+                    <p style="font-size:2rem; font-weight:700; margin:0; color:#10B981;">{year_data['最终得分']}</p>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -1469,8 +1451,8 @@ elif page == "🏢 企业深度画像":
             with col1:
                 radar_data = []
                 for proj in PROJECT_LIST:
-                    score = int(year_data[f"项目_{proj}_得分"])  # 关键：强制转为int
-                    full = int(year_data[f"项目_{proj}_满分"])    # 关键：强制转为int
+                    score = year_data[f"项目_{proj}_得分"]
+                    full = year_data[f"项目_{proj}_满分"]
                     rate = score / full if full > 0 else 0
                     radar_data.append({
                         '项目': proj,
@@ -1533,22 +1515,19 @@ elif page == "🏢 企业深度画像":
             st.subheader(f"📝 {selected_year_value}年 详细评分明细")
             
             for proj_name in PROJECT_LIST:
-                score_val = int(year_data[f"项目_{proj_name}_得分"])   # 关键修改：强制int
-                full_val = int(year_data[f"项目_{proj_name}_满分"])     # 关键修改：强制int
+                col_score = f"项目_{proj_name}_得分"
+                col_full = f"项目_{proj_name}_满分"
+                col_reason = f"项目_{proj_name}_评分理由"
+                col_evidence = f"项目_{proj_name}_证据"
+                
+                score_val = year_data[col_score]
+                full_val = year_data[col_full]
                 progress = score_val / full_val if full_val > 0 else 0
                 
-                # 尝试获取理由和证据
-                reason_key = f"项目_{proj_name}_评分理由"
-                evidence_key = f"项目_{proj_name}_证据"
-                
-                reason_val = year_data[reason_key]
-                evidence_val = year_data[evidence_key]
-                
-                # 关键修改：展开器标题中使用整数格式 "{score}/{full}" 而非浮点数
                 with st.expander(f"{proj_name} ({score_val}/{full_val})"):
                     st.progress(progress, text=f"得分水平: {progress:.1%}")
-                    st.markdown(f"**评分理由**: {reason_val}")
-                    st.markdown(f"**证据**: {evidence_val}")
+                    st.markdown(f"**评分理由**: {year_data[col_reason]}")
+                    st.markdown(f"**证据**: {year_data[col_evidence]}")
             
             st.subheader(f"💡 {selected_year_value}年 综合评价与建议")
             col1, col2, col3 = st.columns(3)
@@ -1780,7 +1759,7 @@ elif page == "📊 行业对标分析":
                 
                 st.plotly_chart(fig, use_container_width=True)
 
-# --- 页面 4: 智能PDF打分 (第四页，重点修改分数显示为整数) ---
+# --- 页面 4: 智能PDF打分 (第四页，1:1复刻企业深度画像格式) ---
 elif page == "🤖 智能PDF打分":
     st.title("智能PDF打分")
     st.markdown("上传企业ESG报告PDF文件，系统将自动进行碳披露评分")
@@ -1851,7 +1830,7 @@ elif page == "🤖 智能PDF打分":
         
         st.divider()
         
-        # 直接使用 result 里已经算好的分数（强制转为int）
+        # 直接使用 result 里已经算好的分数
         final_score = int(result.get('最终得分', 0))
         final_level = result.get('评级', '待改进')
         
@@ -1916,8 +1895,8 @@ elif page == "🤖 智能PDF打分":
         with col1:
             radar_data = []
             for proj in PROJECT_LIST:
-                score = int(result.get(f"项目_{proj}_得分", 0))   # 关键：强制转int
-                full = int(result.get(f"项目_{proj}_满分", 2))     # 关键：强制转int
+                score = int(result.get(f"项目_{proj}_得分", 0))
+                full = int(result.get(f"项目_{proj}_满分", 2))
                 rate = score / full if full > 0 else 0
                 radar_data.append({
                     '项目': proj,
@@ -1983,8 +1962,8 @@ elif page == "🤖 智能PDF打分":
         st.subheader(f"📝 {result['year']}年 详细评分明细")
         
         for proj_name in PROJECT_LIST:
-            score_val = int(result.get(f"项目_{proj_name}_得分", 0))   # 关键修改：强制int
-            full_val = int(result.get(f"项目_{proj_name}_满分", 2))     # 关键修改：强制int
+            score_val = int(result.get(f"项目_{proj_name}_得分", 0))
+            full_val = int(result.get(f"项目_{proj_name}_满分", 2))
             progress = score_val / full_val if full_val > 0 else 0
             
             # 尝试获取理由和证据
@@ -1994,7 +1973,6 @@ elif page == "🤖 智能PDF打分":
             reason_val = result.get(reason_key, "暂无")
             evidence_val = result.get(evidence_key, "暂无")
             
-            # 关键修改：展开器标题中使用整数格式 "{score}/{full}"
             with st.expander(f"{proj_name} ({score_val}/{full_val})"):
                 st.progress(progress, text=f"得分水平: {progress:.1%}")
                 st.markdown(f"**评分理由**: {reason_val}")
@@ -2022,20 +2000,49 @@ elif page == "🤖 智能PDF打分":
             st.markdown(formatted_suggestion)
         
         # ==========================================
-        # 底部：仅保留下载按钮（已移除合并按钮）
+        # 底部：合并/下载按钮
         # ==========================================
         st.divider()
+        col1, col2 = st.columns(2)
         
-        def convert_single_row(row):
-            output = BytesIO()
-            pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
-            return output.getvalue()
+        with col1:
+            if st.button("💾 合并到我的小样本（安全去重）", use_container_width=True):
+                if st.session_state.df is None:
+                    st.warning("小样本未加载，无法合并")
+                else:
+                    new_code = result['code']
+                    new_year = result['year']
+                    df = st.session_state.df.copy()
+                    df['code'] = df['code'].astype(str).str.strip().str.zfill(6)
+
+                    original_count = len(df)
+                    mask = (df['code'] == new_code) & (df['year'] == new_year)
+                    duplicate_count = mask.sum()
+
+                    if duplicate_count > 0:
+                        df = df[~mask].copy()
+
+                    new_row = pd.DataFrame([result])
+                    df_final = pd.concat([df, new_row], ignore_index=True)
+
+                    st.session_state.df = df_final
+
+                    st.success("✅ 合并成功！（已自动覆盖旧数据）")
+                    st.write(f"• 合并前：{original_count} 条")
+                    st.write(f"• 合并后：{len(df_final)} 条")
+                    st.info(f"现在去【企业深度画像】输入 {new_code} 查看最新数据")
         
-        excel_data = convert_single_row(result)
-        st.download_button(
-            label="📥 下载单条结果Excel",
-            data=excel_data,
-            file_name=f"{result['公司名称']}_{result['year']}_ESG碳披露评分结果.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        with col2:
+            def convert_single_row(row):
+                output = BytesIO()
+                pd.DataFrame([row]).to_excel(output, index=False, engine='openpyxl')
+                return output.getvalue()
+            
+            excel_data = convert_single_row(result)
+            st.download_button(
+                label="📥 下载单条结果Excel",
+                data=excel_data,
+                file_name=f"{result['公司名称']}_{result['year']}_ESG碳披露评分结果.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )

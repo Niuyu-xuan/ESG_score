@@ -55,6 +55,7 @@ DIMENSION_SHORT_NAME_MAP = {
     "碳排放量或减排量披露": "排放/减排量"
 }
 
+# ESG绿色配色方案
 ESG_COLORS = px.colors.sequential.Greens[3:]
 MAIN_COLOR = "#059669"
 
@@ -85,12 +86,17 @@ def safe_int(value, default=0) -> int:
 
 
 def safe_int_str(value, default="0") -> str:
+    """
+    将任意值安全转换为整数字符串。
+    例如：1.0 -> '1'，NaN -> '0'
+    """
     return str(safe_int(value, safe_int(default, 0)))
 
 
 def normalize_code(value) -> str:
     """
     统一股票代码为6位字符串。
+    可处理 Excel 读取出的 600759.0。
     """
     try:
         if value is None or pd.isna(value):
@@ -104,59 +110,12 @@ def normalize_code(value) -> str:
 
 
 def clean_brackets(text):
+    """
+    清理 AI 输出中可能残留的中文方括号。
+    """
     if isinstance(text, str):
         return text.replace("【", "").replace("】", "")
     return text
-
-
-def read_dataset_file(file_path: str) -> pd.DataFrame:
-    """
-    稳健读取数据集文件。
-
-    解决报错：
-    Excel file format cannot be determined, you must specify an engine manually.
-
-    读取顺序：
-    1. openpyxl 读取 xlsx
-    2. xlrd 读取 xls
-    3. csv 方式兜底读取
-    """
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"文件不存在：{file_path}")
-
-    if os.path.isdir(file_path):
-        raise IsADirectoryError(f"路径是文件夹，不是文件：{file_path}")
-
-    errors = []
-
-    # 1. 优先用 openpyxl 读取 xlsx
-    try:
-        return pd.read_excel(file_path, engine="openpyxl")
-    except Exception as e:
-        errors.append(f"openpyxl读取失败：{repr(e)}")
-
-    # 2. 尝试 xlrd，适合老版 xls
-    try:
-        return pd.read_excel(file_path, engine="xlrd")
-    except Exception as e:
-        errors.append(f"xlrd读取失败：{repr(e)}")
-
-    # 3. 尝试作为 CSV 读取
-    for enc in ["utf-8-sig", "utf-8", "gbk", "gb18030"]:
-        try:
-            return pd.read_csv(file_path, encoding=enc)
-        except Exception as e:
-            errors.append(f"CSV({enc})读取失败：{repr(e)}")
-
-    error_text = "\n".join(errors[-6:])
-    raise ValueError(
-        "无法读取数据集文件。请确认：\n"
-        "1. 文件确实是有效的 Excel 文件；\n"
-        "2. 如果是 .xlsx，请安装 openpyxl：pip install openpyxl；\n"
-        "3. 如果是旧版 .xls，请安装 xlrd：pip install xlrd；\n"
-        "4. 如果文件其实是 CSV，请不要直接把 .csv 改名为 .xlsx，建议另存为真正的 Excel。\n\n"
-        f"详细错误：\n{error_text}"
-    )
 
 
 def sanitize_filename(name: str) -> str:
@@ -1107,12 +1066,7 @@ with st.sidebar:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             excel_path = os.path.join(current_dir, "database.xlsx")
 
-            df = read_dataset_file(excel_path)
-
-            if 'code' not in df.columns:
-                raise ValueError("数据集中缺少必要列：code")
-            if 'year' not in df.columns:
-                raise ValueError("数据集中缺少必要列：year")
+            df = pd.read_excel(excel_path)
 
             df['code'] = df['code'].apply(normalize_code)
             df['year'] = pd.to_numeric(df['year'], errors='coerce').fillna(0).astype(int)
@@ -1149,13 +1103,13 @@ with st.sidebar:
     st.session_state.df = load_local_excel()
 
     if st.session_state.df is not None:
-        st.success(f"✅ 本地数据集已加载！共 {len(st.session_state.df)} 条记录")
+        st.success(f"✅ 本地小样本已加载！共 {len(st.session_state.df)} 条记录")
         with st.expander("🔍 查看可用公司代码"):
             unique_codes = sorted(st.session_state.df['code'].unique())
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
-        st.warning("ℹ️ 未成功加载 数据集.xlsx，请确认文件存在且格式正确")
+        st.warning("ℹ️ 未找到 前端样本3.xlsx")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -1180,7 +1134,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
         st.write("✅ 行业经济绩效与碳披露四象限对标")
         st.write("✅ 年度碳披露描述性统计与Top/Bottom 5")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("ℹ️ 请确保 数据集.xlsx 文件在同一目录下，并且是有效的 Excel 文件")
+        st.info("ℹ️ 请确保 前端样本3.xlsx 文件在同一目录下")
         st.stop()
 
 
@@ -1390,6 +1344,7 @@ elif page == "🏢 企业深度画像":
                 height=300
             )
 
+            # ===== 优化后的趋势图区域 =====
             st.subheader("📈 多维度得分趋势对比")
 
             all_dimensions = ['最终得分'] + PROJECT_LIST

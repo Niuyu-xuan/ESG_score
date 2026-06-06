@@ -1105,9 +1105,8 @@ with st.sidebar:
     def load_local_excel():
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            excel_path = os.path.join(current_dir, "数据集.xlsx")
+            excel_path = os.path.join(current_dir, "database.xlsx")
 
-            # 关键修改：不再直接 pd.read_excel(excel_path)，改为稳健读取
             df = read_dataset_file(excel_path)
 
             if 'code' not in df.columns:

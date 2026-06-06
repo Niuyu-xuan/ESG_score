@@ -86,17 +86,12 @@ def safe_int(value, default=0) -> int:
 
 
 def safe_int_str(value, default="0") -> str:
-    """
-    将任意值安全转换为整数字符串。
-    例如：1.0 -> '1'，NaN -> '0'
-    """
     return str(safe_int(value, safe_int(default, 0)))
 
 
 def normalize_code(value) -> str:
     """
     统一股票代码为6位字符串。
-    可处理 Excel 读取出的 600759.0。
     """
     try:
         if value is None or pd.isna(value):
@@ -110,9 +105,6 @@ def normalize_code(value) -> str:
 
 
 def clean_brackets(text):
-    """
-    清理 AI 输出中可能残留的中文方括号。
-    """
     if isinstance(text, str):
         return text.replace("【", "").replace("】", "")
     return text
@@ -1064,7 +1056,7 @@ with st.sidebar:
     def load_local_excel():
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            excel_path = os.path.join(current_dir, "前端样本3.xlsx")
+            excel_path = os.path.join(current_dir, "数据集.xlsx")
 
             df = pd.read_excel(excel_path)
 
@@ -1109,7 +1101,7 @@ with st.sidebar:
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
-        st.warning("ℹ️ 未找到 前端样本3.xlsx")
+        st.warning("ℹ️ 未找到 数据集.xlsx")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -1134,7 +1126,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
         st.write("✅ 行业经济绩效与碳披露四象限对标")
         st.write("✅ 年度碳披露描述性统计与Top/Bottom 5")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("ℹ️ 请确保 前端样本3.xlsx 文件在同一目录下")
+        st.info("ℹ️ 请确保 数据集.xlsx 文件在同一目录下")
         st.stop()
 
 

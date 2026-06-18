@@ -60,6 +60,33 @@ ESG_COLORS = px.colors.sequential.Greens[3:]
 MAIN_COLOR = "#059669"
 
 
+def safe_float(value, default=0.0) -> float:
+    """
+    将任意值安全转换为浮点数。
+    可处理：NaN、None、inf、'1.0'、'12.5%'、'1,234.56'等。
+    """
+    try:
+        if value is None:
+            return default
+
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            if pd.isna(value) or np.isinf(value):
+                return default
+            return float(value)
+
+        if isinstance(value, str):
+            v = value.strip().replace(",", "").replace("，", "")
+            if v == "" or v.lower() in ("nan", "none", "inf", "-inf"):
+                return default
+            if v.endswith("%"):
+                return float(v[:-1]) / 100.0
+            return float(v)
+
+        return float(value)
+    except Exception:
+        return default
+
+
 def safe_int(value, default=0) -> int:
     """
     将任意值安全转换为整数。
@@ -1084,6 +1111,11 @@ with st.sidebar:
             if '最终得分' in df.columns:
                 df['最终得分'] = df['最终得分'].apply(lambda x: safe_int(x, 0))
 
+            # ✅ 修复：自动处理所有财务列（以F05开头的列），使用 safe_float 保留小数
+            finance_cols = [c for c in df.columns if c.startswith('F05')]
+            for col in finance_cols:
+                df[col] = df[col].apply(safe_float)
+
             for col in ['核心优势', '核心问题', '改进建议', '综合评价']:
                 if col in df.columns:
                     df[col] = (
@@ -1103,13 +1135,13 @@ with st.sidebar:
     st.session_state.df = load_local_excel()
 
     if st.session_state.df is not None:
-        st.success(f"✅ 本地小样本已加载！共 {len(st.session_state.df)} 条记录")
+        st.success(f"✅ 本地数据已加载！共 {len(st.session_state.df)} 条记录")
         with st.expander("🔍 查看可用公司代码"):
             unique_codes = sorted(st.session_state.df['code'].unique())
             st.write(f"共 {len(unique_codes)} 家公司")
             st.dataframe(pd.DataFrame(unique_codes, columns=['公司代码']), height=200)
     else:
-        st.warning("ℹ️ 未找到 前端样本3.xlsx")
+        st.warning("ℹ️ 未找到 database.xlsx")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -1134,7 +1166,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
         st.write("✅ 行业经济绩效与碳披露四象限对标")
         st.write("✅ 年度碳披露描述性统计与Top/Bottom 5")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("ℹ️ 请确保 前端样本3.xlsx 文件在同一目录下")
+        st.info("ℹ️ 请确保 database.xlsx 文件在同一目录下")
         st.stop()
 
 
@@ -1344,7 +1376,6 @@ elif page == "🏢 企业深度画像":
                 height=300
             )
 
-            # ===== 优化后的趋势图区域 =====
             st.subheader("📈 多维度得分趋势对比")
 
             all_dimensions = ['最终得分'] + PROJECT_LIST
@@ -1662,136 +1693,134 @@ elif page == "📊 行业对标分析":
             peer_df['最终得分'] = peer_df['最终得分'].apply(lambda x: safe_int(x, 0))
 
             if bm_econ_code not in peer_df.columns:
-                st.warning(f"⚠️ 数据中未找到财务指标 [{bm_econ_name}]，将使用随机数据演示")
-                np.random.seed(42)
-                peer_df[bm_econ_code] = np.random.uniform(-0.1, 0.2, len(peer_df))
+                st.warning(f"⚠️ 数据中未找到财务指标 [{bm_econ_name}]，请检查Excel列名")
             else:
+                # 财务列已在加载时用 safe_float 处理，此处无需再做 pd.to_numeric，但为了兼容仍保留
                 peer_df[bm_econ_code] = pd.to_numeric(peer_df[bm_econ_code], errors='coerce')
+                peer_df = peer_df.dropna(subset=[bm_econ_code, '最终得分'])
 
-            peer_df = peer_df.dropna(subset=[bm_econ_code, '最终得分'])
+                if len(peer_df) < 2:
+                    st.warning(f"⚠️ 该行业({industry})当年样本量不足2家，无法进行有效对比分析")
+                else:
+                    target = peer_df[peer_df['code'] == bm_code].iloc[0]
 
-            if len(peer_df) < 2:
-                st.warning(f"⚠️ 该行业({industry})当年样本量不足2家，无法进行有效对比分析")
-            else:
-                target = peer_df[peer_df['code'] == bm_code].iloc[0]
+                    peer_df_sorted_econ = peer_df.sort_values(by=bm_econ_code, ascending=False).reset_index(drop=True)
+                    econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1
+                    econ_total = len(peer_df_sorted_econ)
 
-                peer_df_sorted_econ = peer_df.sort_values(by=bm_econ_code, ascending=False).reset_index(drop=True)
-                econ_rank = (peer_df_sorted_econ['code'] == target['code']).idxmax() + 1
-                econ_total = len(peer_df_sorted_econ)
+                    peer_df_sorted_carbon = peer_df.sort_values(by='最终得分', ascending=False).reset_index(drop=True)
+                    carbon_rank = (peer_df_sorted_carbon['code'] == target['code']).idxmax() + 1
+                    carbon_total = len(peer_df_sorted_carbon)
 
-                peer_df_sorted_carbon = peer_df.sort_values(by='最终得分', ascending=False).reset_index(drop=True)
-                carbon_rank = (peer_df_sorted_carbon['code'] == target['code']).idxmax() + 1
-                carbon_total = len(peer_df_sorted_carbon)
+                    st.divider()
+                    st.subheader("📊 对标结果")
+                    col1, col2, col3 = st.columns(3)
 
-                st.divider()
-                st.subheader("📊 对标结果")
-                col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <h3 style="margin-top:0;">对标行业</h3>
+                            <p style="font-size:1.5rem; font-weight:700; margin:0;">{industry}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                with col1:
+                    with col2:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <h3 style="margin-top:0;">{bm_econ_name} 排名</h3>
+                            <p style="font-size:1.5rem; font-weight:700; margin:0;">{econ_rank}/{econ_total}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    with col3:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <h3 style="margin-top:0;">碳披露得分 排名</h3>
+                            <p style="font-size:1.5rem; font-weight:700; margin:0;">{carbon_rank}/{carbon_total}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    median_econ = peer_df[bm_econ_code].median()
+                    median_carbon = peer_df['最终得分'].median()
+
+                    is_high_econ = target[bm_econ_code] >= median_econ
+                    is_high_carbon = target['最终得分'] >= median_carbon
+
+                    quadrant_info = {
+                        (True, True): ("🌟 双优型", "高经济绩效 · 高碳披露", "green"),
+                        (True, False): ("⚠️ 偏科型", "高经济绩效 · 低碳披露", "orange"),
+                        (False, True): ("💪 潜力型", "低经济绩效 · 高碳披露", "blue"),
+                        (False, False): ("🔴 落后型", "低经济绩效 · 低碳披露", "red")
+                    }
+
+                    quadrant_title, quadrant_desc, color = quadrant_info[(is_high_econ, is_high_carbon)]
+
                     st.markdown(f"""
-                    <div class="metric-card">
-                        <h3 style="margin-top:0;">对标行业</h3>
-                        <p style="font-size:1.5rem; font-weight:700; margin:0;">{industry}</p>
+                    <div style="text-align:center; padding:2rem; background: linear-gradient(135deg, #F8FAFC 0%, #F0FDF4 100%); border-radius:16px; margin:1rem 0;">
+                        <h2 style="color:{color}; margin:0;">{quadrant_title}</h2>
+                        <p style="font-size:1.2rem; margin:0.5rem 0; color:#374151;">{quadrant_desc}</p>
                     </div>
                     """, unsafe_allow_html=True)
 
-                with col2:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h3 style="margin-top:0;">{bm_econ_name} 排名</h3>
-                        <p style="font-size:1.5rem; font-weight:700; margin:0;">{econ_rank}/{econ_total}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                with col3:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h3 style="margin-top:0;">碳披露得分 排名</h3>
-                        <p style="font-size:1.5rem; font-weight:700; margin:0;">{carbon_rank}/{carbon_total}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                median_econ = peer_df[bm_econ_code].median()
-                median_carbon = peer_df['最终得分'].median()
-
-                is_high_econ = target[bm_econ_code] >= median_econ
-                is_high_carbon = target['最终得分'] >= median_carbon
-
-                quadrant_info = {
-                    (True, True): ("🌟 双优型", "高经济绩效 · 高碳披露", "green"),
-                    (True, False): ("⚠️ 偏科型", "高经济绩效 · 低碳披露", "orange"),
-                    (False, True): ("💪 潜力型", "低经济绩效 · 高碳披露", "blue"),
-                    (False, False): ("🔴 落后型", "低经济绩效 · 低碳披露", "red")
-                }
-
-                quadrant_title, quadrant_desc, color = quadrant_info[(is_high_econ, is_high_carbon)]
-
-                st.markdown(f"""
-                <div style="text-align:center; padding:2rem; background: linear-gradient(135deg, #F8FAFC 0%, #F0FDF4 100%); border-radius:16px; margin:1rem 0;">
-                    <h2 style="color:{color}; margin:0;">{quadrant_title}</h2>
-                    <p style="font-size:1.2rem; margin:0.5rem 0; color:#374151;">{quadrant_desc}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-                fig = px.scatter(
-                    peer_df,
-                    x=bm_econ_code,
-                    y='最终得分',
-                    hover_data=['公司名称', 'code'],
-                    title=f'{industry} 行业 {bm_year} 年企业绩效分布图',
-                    labels={
-                        bm_econ_code: bm_econ_name,
-                        '最终得分': '碳披露最终得分'
-                    },
-                    opacity=0.6,
-                    color_discrete_sequence=['#94A3B8']
-                )
-
-                fig.add_scatter(
-                    x=[target[bm_econ_code]],
-                    y=[target['最终得分']],
-                    mode='markers+text',
-                    marker=dict(size=20, color='#EF4444', symbol='star'),
-                    text=[target['公司名称']],
-                    textposition='top center',
-                    name='目标企业',
-                    textfont=dict(size=14, color='#EF4444')
-                )
-
-                fig.add_vline(
-                    x=median_econ,
-                    line_dash="dash",
-                    line_color="#64748B",
-                    line_width=2,
-                    annotation_text="行业中位数",
-                    annotation_position="top right"
-                )
-                fig.add_hline(
-                    y=median_carbon,
-                    line_dash="dash",
-                    line_color="#64748B",
-                    line_width=2
-                )
-
-                fig.update_layout(
-                    plot_bgcolor='white',
-                    paper_bgcolor='white',
-                    title_font=dict(size=18, color='#065F46'),
-                    showlegend=False,
-                    height=560,
-                    xaxis=dict(
-                        gridcolor='#F0F0F0',
-                        tickfont=dict(color='#1F2937'),
-                        title_font=dict(color='#1F2937')
-                    ),
-                    yaxis=dict(
-                        gridcolor='#F0F0F0',
-                        tickfont=dict(color='#1F2937'),
-                        title_font=dict(color='#1F2937')
+                    fig = px.scatter(
+                        peer_df,
+                        x=bm_econ_code,
+                        y='最终得分',
+                        hover_data=['公司名称', 'code'],
+                        title=f'{industry} 行业 {bm_year} 年企业绩效分布图',
+                        labels={
+                            bm_econ_code: bm_econ_name,
+                            '最终得分': '碳披露最终得分'
+                        },
+                        opacity=0.6,
+                        color_discrete_sequence=['#94A3B8']
                     )
-                )
 
-                st.plotly_chart(fig, use_container_width=True)
+                    fig.add_scatter(
+                        x=[target[bm_econ_code]],
+                        y=[target['最终得分']],
+                        mode='markers+text',
+                        marker=dict(size=20, color='#EF4444', symbol='star'),
+                        text=[target['公司名称']],
+                        textposition='top center',
+                        name='目标企业',
+                        textfont=dict(size=14, color='#EF4444')
+                    )
+
+                    fig.add_vline(
+                        x=median_econ,
+                        line_dash="dash",
+                        line_color="#64748B",
+                        line_width=2,
+                        annotation_text="行业中位数",
+                        annotation_position="top right"
+                    )
+                    fig.add_hline(
+                        y=median_carbon,
+                        line_dash="dash",
+                        line_color="#64748B",
+                        line_width=2
+                    )
+
+                    fig.update_layout(
+                        plot_bgcolor='white',
+                        paper_bgcolor='white',
+                        title_font=dict(size=18, color='#065F46'),
+                        showlegend=False,
+                        height=560,
+                        xaxis=dict(
+                            gridcolor='#F0F0F0',
+                            tickfont=dict(color='#1F2937'),
+                            title_font=dict(color='#1F2937')
+                        ),
+                        yaxis=dict(
+                            gridcolor='#F0F0F0',
+                            tickfont=dict(color='#1F2937'),
+                            title_font=dict(color='#1F2937')
+                        )
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
 
 
 # ================= 页面 4：智能PDF打分 =================

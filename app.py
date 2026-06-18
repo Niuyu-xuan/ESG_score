@@ -995,6 +995,17 @@ st.markdown("""
         border-color: #10B981;
         box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
     }
+
+    /* ========== 新增：下拉菜单向上弹出 ========== */
+    .stSelectbox div[data-baseweb="popover"] {
+        top: auto !important;
+        bottom: 100% !important;
+        transform: none !important;
+    }
+    .stSelectbox ul[role="listbox"] {
+        top: auto !important;
+        bottom: 100% !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1489,7 +1500,7 @@ elif page == "🏢 企业深度画像":
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:
-                # ✅ 修改1：最终得分显示为“得分/20”格式
+                # ✅ 最终得分显示为“得分/20”格式
                 st.markdown(f"""
                 <div class="metric-card">
                     <h3 style="margin-top:0; color:#065F46;">最终得分</h3>
@@ -1655,7 +1666,7 @@ elif page == "📊 行业对标分析":
             value=2023
         )
 
-    # ✅ 修改2：使用新搜索组件
+    # ✅ 使用新搜索组件
     selected_code, search_clicked = company_selector_single(st.session_state.df, key_prefix="benchmark")
 
     if search_clicked and selected_code:

@@ -61,14 +61,19 @@ MAIN_COLOR = "#059669"
 
 
 def safe_float(value, default=0.0) -> float:
-    """安全转换为浮点数，支持百分号、千位分隔符等"""
+    """
+    将任意值安全转换为浮点数。
+    可处理：NaN、None、inf、'1.0'、'12.5%'、'1,234.56'等。
+    """
     try:
         if value is None:
             return default
+
         if isinstance(value, (int, float, np.integer, np.floating)):
             if pd.isna(value) or np.isinf(value):
                 return default
             return float(value)
+
         if isinstance(value, str):
             v = value.strip().replace(",", "").replace("，", "")
             if v == "" or v.lower() in ("nan", "none", "inf", "-inf"):
@@ -76,30 +81,50 @@ def safe_float(value, default=0.0) -> float:
             if v.endswith("%"):
                 return float(v[:-1]) / 100.0
             return float(v)
+
         return float(value)
     except Exception:
         return default
 
 
 def safe_int(value, default=0) -> int:
+    """
+    将任意值安全转换为整数。
+    可处理：NaN、None、inf、'1.0'、1.0、空字符串。
+    """
     try:
         if value is None:
             return default
+
         if isinstance(value, str):
             v = value.strip()
             if v == "" or v.lower() in ("nan", "none", "inf", "-inf"):
                 return default
             return int(float(v))
+
         if isinstance(value, (int, float, np.integer, np.floating)):
             if pd.isna(value) or np.isinf(value):
                 return default
             return int(value)
+
         return int(float(value))
     except Exception:
         return default
 
 
+def safe_int_str(value, default="0") -> str:
+    """
+    将任意值安全转换为整数字符串。
+    例如：1.0 -> '1'，NaN -> '0'
+    """
+    return str(safe_int(value, safe_int(default, 0)))
+
+
 def normalize_code(value) -> str:
+    """
+    统一股票代码为6位字符串。
+    可处理 Excel 读取出的 600759.0。
+    """
     try:
         if value is None or pd.isna(value):
             return ""
@@ -112,6 +137,9 @@ def normalize_code(value) -> str:
 
 
 def clean_brackets(text):
+    """
+    清理 AI 输出中可能残留的中文方括号。
+    """
     if isinstance(text, str):
         return text.replace("【", "").replace("】", "")
     return text
@@ -1048,53 +1076,24 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
                 pass
 
 
-# ================= 通用公司搜索组件 =================
-def company_selector(df, key_prefix=""):
-    """返回 (selected_code, search_button_clicked)"""
-    # 构建公司名称+代码的选项列表
+# ✅ 改进后的公司选择器（单个下拉框，支持搜索过滤）
+def company_selector_single(df, key_prefix=""):
     if df is None or df.empty:
         return None, False
-
-    all_companies = df[['公司名称', 'code']].drop_duplicates().copy()
+    # 构建显示列表，格式为“公司名称 (代码)”
+    all_companies = df[['公司名称', 'code']].drop_duplicates()
     all_companies['display'] = all_companies['公司名称'] + " (" + all_companies['code'] + ")"
-
-    st.text_input(
-        "🔍 输入关键字搜索（公司名称或代码）",
-        key=f"{key_prefix}_search_keyword",
-        placeholder="例如：比亚迪 或 002594",
-        label_visibility="collapsed"
+    options = ["-- 请选择公司 --"] + all_companies['display'].tolist()
+    selected_display = st.selectbox(
+        "🔍 选择或搜索公司（可输入公司名称或代码进行过滤）",
+        options,
+        key=f"{key_prefix}_select"
     )
-
-    keyword = st.session_state.get(f"{key_prefix}_search_keyword", "").strip()
-
-    if keyword:
-        mask = all_companies['公司名称'].str.contains(keyword, na=False) | all_companies['code'].str.contains(keyword, na=False)
-        matches = all_companies[mask]
-    else:
-        matches = all_companies.head(0)  # 空时显示空
-
-    if not matches.empty:
-        options = matches['display'].tolist()
-        # 默认选中第一个
-        selected_display = st.selectbox(
-            "选择匹配的公司",
-            options=options,
-            key=f"{key_prefix}_select_company"
-        )
-        # 提取code
-        selected_code = selected_display.split("(")[-1].rstrip(")")
-    else:
-        if keyword:
-            st.warning("未找到匹配的公司，请尝试其他关键字")
-        selected_display = st.selectbox(
-            "选择匹配的公司",
-            options=[],
-            key=f"{key_prefix}_select_company_empty"
-        )
-        selected_code = None
-
     btn = st.button("🔍 查询企业", key=f"{key_prefix}_search_button", use_container_width=True)
-    return selected_code, btn
+    if selected_display and selected_display != "-- 请选择公司 --":
+        code = selected_display.split("(")[-1].rstrip(")")
+        return code, btn
+    return None, btn
 
 
 # ================= 侧边栏 =================
@@ -1132,7 +1131,7 @@ with st.sidebar:
             if '最终得分' in df.columns:
                 df['最终得分'] = df['最终得分'].apply(lambda x: safe_int(x, 0))
 
-            # 自动处理财务列
+            # ✅ 自动处理所有财务列（以F05开头的列），使用 safe_float 保留小数
             finance_cols = [c for c in df.columns if c.startswith('F05')]
             for col in finance_cols:
                 df[col] = df[col].apply(safe_float)
@@ -1286,7 +1285,8 @@ elif page == "🏢 企业深度画像":
     st.title("企业深度画像")
     st.markdown("查询单企业历年ESG碳披露表现，进行多维度趋势分析与详细评分解读")
 
-    selected_code, search_clicked = company_selector(st.session_state.df, key_prefix="profile")
+    # ✅ 使用新的搜索组件
+    selected_code, search_clicked = company_selector_single(st.session_state.df, key_prefix="profile")
 
     if search_clicked and selected_code:
         st.session_state.queried_code = selected_code
@@ -1655,8 +1655,8 @@ elif page == "📊 行业对标分析":
             value=2023
         )
 
-    # ✅ 修改2：使用公司搜索组件替换原来的纯代码输入
-    selected_code, search_clicked = company_selector(st.session_state.df, key_prefix="benchmark")
+    # ✅ 修改2：使用新搜索组件
+    selected_code, search_clicked = company_selector_single(st.session_state.df, key_prefix="benchmark")
 
     if search_clicked and selected_code:
         st.session_state.benchmark_code = selected_code
@@ -1689,6 +1689,7 @@ elif page == "📊 行业对标分析":
             if bm_econ_code not in peer_df.columns:
                 st.warning(f"⚠️ 数据中未找到财务指标 [{bm_econ_name}]，请检查Excel列名")
             else:
+                # 财务列已在加载时用 safe_float 处理，此处再确保一下
                 peer_df[bm_econ_code] = pd.to_numeric(peer_df[bm_econ_code], errors='coerce')
                 peer_df = peer_df.dropna(subset=[bm_econ_code, '最终得分'])
 
@@ -1899,7 +1900,6 @@ elif page == "🤖 智能PDF打分":
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            # PDF打分页面也可以选择显示为得分/20，但按需求只改企业深度画像，这里保持不变
             st.markdown(f"""
             <div class="metric-card">
                 <h3 style="margin-top:0; color:#065F46;">最终得分</h3>

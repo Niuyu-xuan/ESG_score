@@ -61,19 +61,13 @@ MAIN_COLOR = "#059669"
 
 
 def safe_float(value, default=0.0) -> float:
-    """
-    将任意值安全转换为浮点数。
-    可处理：NaN、None、inf、'1.0'、'12.5%'、'1,234.56'等。
-    """
     try:
         if value is None:
             return default
-
         if isinstance(value, (int, float, np.integer, np.floating)):
             if pd.isna(value) or np.isinf(value):
                 return default
             return float(value)
-
         if isinstance(value, str):
             v = value.strip().replace(",", "").replace("，", "")
             if v == "" or v.lower() in ("nan", "none", "inf", "-inf"):
@@ -81,50 +75,34 @@ def safe_float(value, default=0.0) -> float:
             if v.endswith("%"):
                 return float(v[:-1]) / 100.0
             return float(v)
-
         return float(value)
     except Exception:
         return default
 
 
 def safe_int(value, default=0) -> int:
-    """
-    将任意值安全转换为整数。
-    可处理：NaN、None、inf、'1.0'、1.0、空字符串。
-    """
     try:
         if value is None:
             return default
-
         if isinstance(value, str):
             v = value.strip()
             if v == "" or v.lower() in ("nan", "none", "inf", "-inf"):
                 return default
             return int(float(v))
-
         if isinstance(value, (int, float, np.integer, np.floating)):
             if pd.isna(value) or np.isinf(value):
                 return default
             return int(value)
-
         return int(float(value))
     except Exception:
         return default
 
 
 def safe_int_str(value, default="0") -> str:
-    """
-    将任意值安全转换为整数字符串。
-    例如：1.0 -> '1'，NaN -> '0'
-    """
     return str(safe_int(value, safe_int(default, 0)))
 
 
 def normalize_code(value) -> str:
-    """
-    统一股票代码为6位字符串。
-    可处理 Excel 读取出的 600759.0。
-    """
     try:
         if value is None or pd.isna(value):
             return ""
@@ -137,9 +115,6 @@ def normalize_code(value) -> str:
 
 
 def clean_brackets(text):
-    """
-    清理 AI 输出中可能残留的中文方括号。
-    """
     if isinstance(text, str):
         return text.replace("【", "").replace("】", "")
     return text
@@ -994,17 +969,6 @@ st.markdown("""
     .stTextInput > div > div > input:focus {
         border-color: #10B981;
         box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-    }
-
-    /* ========== 新增：下拉菜单向上弹出 ========== */
-    .stSelectbox div[data-baseweb="popover"] {
-        top: auto !important;
-        bottom: 100% !important;
-        transform: none !important;
-    }
-    .stSelectbox ul[role="listbox"] {
-        top: auto !important;
-        bottom: 100% !important;
     }
 </style>
 """, unsafe_allow_html=True)

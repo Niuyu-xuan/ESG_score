@@ -1082,13 +1082,11 @@ with st.sidebar:
     if 'df' not in st.session_state:
         st.session_state.df = None
 
+    # ✅ 修改后的数据加载函数 —— 增加文件路径和修改时间参数，使缓存能够感知文件更新
     @st.cache_data
-    def load_local_excel():
+    def load_local_excel(file_path: str, mtime: float):
         try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            excel_path = os.path.join(current_dir, "database.xlsx")
-
-            df = pd.read_excel(excel_path)
+            df = pd.read_excel(file_path)
 
             df['code'] = df['code'].apply(normalize_code)
             df['year'] = pd.to_numeric(df['year'], errors='coerce').fillna(0).astype(int)
@@ -1127,12 +1125,23 @@ with st.sidebar:
             st.error(f"文件加载失败：{str(e)}")
             return None
 
-    st.session_state.df = load_local_excel()
+    # ✅ 动态获取文件路径及其修改时间
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    excel_path = os.path.join(current_dir, "database.xlsx")
+    mtime = os.path.getmtime(excel_path) if os.path.exists(excel_path) else 0.0
+
+    st.session_state.df = load_local_excel(excel_path, mtime)
 
     if st.session_state.df is not None:
         st.success(f"✅ 本地数据已加载！共 {len(st.session_state.df)} 条记录")
     else:
-        st.warning("ℹ️ 未找到 使用数据.xlsx")
+        st.warning("ℹ️ 未找到 database.xlsx")
+
+    # ✅ 手动刷新按钮 —— 一键清空所有缓存并重新运行
+    st.divider()
+    if st.button("🔄 强制刷新数据", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -1157,7 +1166,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
         st.write("✅ 行业经济绩效与碳披露四象限对标")
         st.write("✅ 年度碳披露描述性统计与Top/Bottom 5")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("ℹ️ 请确保 使用数据.xlsx 文件在同一目录下")
+        st.info("ℹ️ 请确保 database.xlsx 文件在同一目录下")
         st.stop()
 
 

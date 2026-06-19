@@ -2,6 +2,9 @@ database.xlsx：使用数据集
 version.py：打分代码
 app.py：前端代码，同时嵌入打分代码，包含全景统计概览、企业深度画像、行业对标分析、智能PDF打分四个功能
 requirements.txt：所用库说明
+2025_隆基绿能：供使用者尝试打分的PDF文件
 可使用API密钥：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
+备注：如果要传入其余的ESG报告PDF进行打分，请命名为“年份_企业名称”的形式，例如“2025_隆基绿能”
 平台链接：https://esgscore-nlbdappiactwehcmnrvyyu.streamlit.app/
 平台密码：ESG123
+Github链接：https://github.com/Niuyu-xuan/ESG_score/tree/main

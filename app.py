@@ -1086,7 +1086,7 @@ with st.sidebar:
     def load_local_excel():
         try:
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            excel_path = os.path.join(current_dir, "database.xlsx")
+            excel_path = os.path.join(current_dir, "使用数据.xlsx")
 
             df = pd.read_excel(excel_path)
 
@@ -1132,7 +1132,7 @@ with st.sidebar:
     if st.session_state.df is not None:
         st.success(f"✅ 本地数据已加载！共 {len(st.session_state.df)} 条记录")
     else:
-        st.warning("ℹ️ 未找到 database.xlsx")
+        st.warning("ℹ️ 未找到 使用数据.xlsx")
 
     st.divider()
     st.subheader("🧭 功能导航")
@@ -1157,7 +1157,7 @@ if st.session_state.df is None and page != "🤖 智能PDF打分":
         st.write("✅ 行业经济绩效与碳披露四象限对标")
         st.write("✅ 年度碳披露描述性统计与Top/Bottom 5")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.info("ℹ️ 请确保 database.xlsx 文件在同一目录下")
+        st.info("ℹ️ 请确保 使用数据.xlsx 文件在同一目录下")
         st.stop()
 
 

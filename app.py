@@ -1051,21 +1051,23 @@ def simple_score_pdf(pdf_file, api_key, company_name, report_year,
                 pass
 
 
-# ✅ 改进后的公司选择器（单个下拉框，支持搜索过滤）
+# ✅ 改进后的公司选择器（单个下拉框，支持搜索过滤，无占位选项）
 def company_selector_single(df, key_prefix=""):
     if df is None or df.empty:
         return None, False
     # 构建显示列表，格式为“公司名称 (代码)”
     all_companies = df[['公司名称', 'code']].drop_duplicates()
     all_companies['display'] = all_companies['公司名称'] + " (" + all_companies['code'] + ")"
-    options = ["-- 请选择公司 --"] + all_companies['display'].tolist()
+    options = all_companies['display'].tolist()
     selected_display = st.selectbox(
         "🔍 选择或搜索公司（可输入公司名称或代码进行过滤）",
         options,
+        index=None,                     # 不默认选中任何项
+        placeholder="请选择公司",       # 显示占位提示
         key=f"{key_prefix}_select"
     )
     btn = st.button("🔍 查询企业", key=f"{key_prefix}_search_button", use_container_width=True)
-    if selected_display and selected_display != "-- 请选择公司 --":
+    if selected_display:               # 有选中时才解析代码
         code = selected_display.split("(")[-1].rstrip(")")
         return code, btn
     return None, btn

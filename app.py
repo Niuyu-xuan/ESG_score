@@ -1139,7 +1139,7 @@ with st.sidebar:
 
     # ✅ 手动刷新按钮 —— 一键清空所有缓存并重新运行
     st.divider()
-    if st.button("🔄 强制刷新数据", use_container_width=True):
+    if st.button("🔄 刷新数据", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
